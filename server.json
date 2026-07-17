@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.AIops-tools/proxy-aiops",
+  "title": "Proxy AIops",
+  "description": "Governed Traefik + Caddy + HAProxy ops: routes, upstreams, certs, 5xx RCA. 26 tools.",
+  "repository": {
+    "url": "https://github.com/AIops-tools/Proxy-AIops",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "proxy-aiops",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -28,7 +28,7 @@ instead), never silent empties.
 | get/set_config_value, delete_config_path, load_config | teaching (edit the provider) | ✅ (the write surface) | teaching (use runtime writes) |
 | set_server_state / set_server_weight | teaching (provider) | teaching (config tree) | ✅ runtime servers |
 
-## MCP tools (26)
+## MCP tools (28)
 
 ### Reads (21)
 
@@ -67,6 +67,13 @@ All four analyses accept injected rows for pure offline analysis.
 | `load_config(config)` | caddy | **high** | re-load the snapshotted full config |
 | `set_server_state(backend, server, state)` | haproxy | medium | restore prior admin state (ready/drain/maint) |
 | `set_server_weight(backend, server, weight)` | haproxy | medium | restore prior weight (0-256) |
+
+### Undo (2)
+
+| Tool | Returns |
+|------|---------|
+| `undo_list(limit?)` | recorded undo descriptors, newest first, with their `_undo_id` |
+| `undo_apply(undo_id, dry_run?)` | replays the recorded inverse (governed like any other write) |
 
 High-risk writes require `PROXY_AUDIT_APPROVED_BY` under the secure-by-default
 policy. Undo descriptors are recorded to `~/.proxy-aiops/undo.db`; their params

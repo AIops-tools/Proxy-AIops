@@ -17,7 +17,12 @@ def traffic_stats(target: Optional[str] = None) -> dict:
 
     Args:
         target: Proxy target name from config; omit for the default.
+
+    Returns an envelope: {"services": [...], "returned": N, "limit": L,
+    "truncated": bool, "total": T}. When "truncated" is true this proxy serves
+    more services than were returned.
     """
+
     return ops.traffic_stats(_get_connection(target))
 
 
@@ -32,5 +37,10 @@ def error_counters(target: Optional[str] = None) -> dict:
 
     Args:
         target: Proxy target name from config; omit for the default.
+
+    Returns an envelope: {"services": [...], "returned": N, "limit": L,
+    "truncated": bool, "total": T}. When "truncated" is true this proxy serves
+    more services than were returned (only the busiest services are returned).
     """
+
     return ops.error_counters(_get_connection(target))

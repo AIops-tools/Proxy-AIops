@@ -1,61 +1,48 @@
-# Proxy AIops v0.1.0 — preview
+# Release notes — proxy-aiops 0.2.0
 
-Governed AI-ops for **Traefik**, **Caddy** and **HAProxy** reverse proxies /
-load balancers for AI agents, with a built-in governance harness (audit,
-policy, token/runaway budget, undo-token recording, graduated risk tiers) and
-an encrypted credential store. Standalone — no external skill-family
-dependency. One MCP server spans all three platforms: a per-target `platform`
-field selects the API shape, and the same 26 tools work on Traefik (API +
-`/metrics`), Caddy (admin API) and HAProxy (Data Plane API v2, HTTP Basic).
+Previous release: 0.1.0.
 
-> **Not affiliated with, endorsed by, or sponsored by Traefik Labs, the Caddy
-> project, HAProxy Technologies, or the HAProxy project.** Traefik, Caddy and
-> HAProxy are trademarks of their respective owners.
-
-> **Preview / mock-only.** All behaviour is validated against mocked JSON /
-> metrics-text responses; it has **not** been run against a live proxy. The
-> concrete REST paths are modelled from each project's public API and need
-> live verification. All three platforms are free/self-hostable, so a small
-> lab is the easiest live check — `proxy-aiops doctor` is the fastest.
-
-## Highlights
-
-- **26 MCP tools** (21 read, 5 write), every one wrapped with `@governed_tool`:
-  - **Status** — `proxy_overview`, `version_info`, `list_entrypoints`.
-  - **Routes** — `list_routes` (hosts/paths normalised across platforms),
-    `route_detail`, `find_route`.
-  - **Services** — `list_services`, `service_detail`, `list_upstreams`,
-    `upstream_detail`, `list_middlewares`.
-  - **Certificates** — `list_certificates` (+ bounded live expiry probe).
-  - **Traffic** — `traffic_stats`, `error_counters`.
-  - **Config** — `config_snapshot`, `search_config`, `get_config_value`.
-  - **Writes** — caddy `set_config_value` / `delete_config_path` /
-    `load_config` (prior config captured → replayable undo), haproxy
-    `set_server_state` (ready/drain/maint) / `set_server_weight` (undo
-    restores the prior value). High-risk writes gate on an approver.
-- **Flagship analyses** (transparent heuristics that show their numbers):
-  - `backend_health_rca` — down upstreams per service with the failure class
-    (connection refused / L4 timeout / TLS / L7 check / DNS / maint) + action.
-  - `cert_expiry_sweep` — days-to-expiry buckets (expired / critical /
-    warning / ok) + per-platform renewal hints.
-  - `error_rate_rca` — per-service 5xx share vs the fleet baseline; the
-    dominant code maps to a cause (503 no-upstream / 502 conn-fail /
-    504 timeout / 500 app error).
-  - `route_conflict_analysis` — shadowed routes, dead routes (service missing
-    or zero servers up), redirect loops.
-- **Support matrix with teaching errors** — ops a platform cannot do fail fast
-  with what to use instead (traefik writes → its providers; caddy counters →
-  access logs; haproxy certs → the .pem pipeline). Never a silent no-op.
-- **Governance** — audit to `~/.proxy-aiops/audit.db`, budget/runaway guard,
-  secure-by-default approver gate for high-risk writes, undo descriptors built
-  from the real fetched before-state (replayable as-is), output sanitisation.
-
-## Install
+## Headline: read-only mode
 
 ```bash
-uv tool install proxy-aiops
-proxy-aiops init && proxy-aiops doctor
+export PROXY_READ_ONLY=1
 ```
 
-Routing note: this tool operates reverse proxies / load balancers. Do NOT use
-it for firewall rules — use firewall-aiops.
+With this set the **6 write tools are never registered** — an MCP
+client lists **22 tools instead of 28**. The writes are not hidden
+behind a flag and not merely refused on call: they are absent from the session,
+so a model cannot invoke one and cannot be argued into one. For a reviewer this
+is checkable rather than promised — connect, list the tools, and the writes are
+not there.
+
+Enforcement is two layers deep: the `@governed_tool` harness refuses every
+non-read operation (covering the CLI and in-process callers too), and the MCP
+server removes write tools from `list_tools()`. Changing entry point does not
+get around it.
+
+## BREAKING — return shapes changed
+
+This release changes payloads that callers may be parsing. Both changes exist
+to stop a result from misrepresenting itself:
+
+1. **Absent fields are now `null`, not `""`.** A missing value and an empty value
+   were previously indistinguishable, which invited consumers to invent the
+   difference. Keys are still always present — only the value may be null.
+2. **Anything with a `limit` now returns an envelope** —
+   `{"<items>": [...], "returned": N, "limit": L, "truncated": bool}`. Truncation is
+   *measured* (one extra row is fetched), never inferred from the page happening to
+   be full. Where a genuine pre-cap total is knowable it is reported as `total`;
+   where it isn't, `total` is deliberately omitted rather than echoing `returned`.
+
+## Also in this release
+
+- **`docs/VERIFICATION.md`** — what the mock suite actually guarantees, a live
+  verification checklist, and the criteria for claiming this tool verified.
+- **`skills/proxy-aiops/references/agent-guardrails.md`** — for driving this tool with a
+  smaller / local model: which guardrails are now enforced for you, and a
+  ready-made system prompt for the rest.
+- Expanded operator playbooks in the skill documentation.
+- The advertised tool count now matches what an MCP client actually lists
+  (it includes `undo_list` / `undo_apply`), and a release gate keeps it honest.
+- The `(preview)` label has been dropped. It never meant unreleased; verification
+  status now lives in `docs/VERIFICATION.md` where it can be specific.

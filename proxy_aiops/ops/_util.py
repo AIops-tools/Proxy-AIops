@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from proxy_aiops.governance import sanitize
+from proxy_aiops.governance import opt_str, sanitize
 
 
 def as_obj(data: Any) -> dict:
@@ -25,6 +25,23 @@ def as_obj(data: Any) -> dict:
 def s(value: Any, limit: int = 256) -> str:
     """Sanitize an arbitrary value to a bounded, injection-safe string."""
     return sanitize(str(value if value is not None else ""), limit)
+
+
+def opt(value: Any, limit: int = 256) -> str | None:
+    """Sanitize an *optional* field, preserving the difference between absent and empty.
+
+    Companion to :func:`s`, which folds ``None`` into ``""``. Traefik, Caddy and
+    HAProxy describe the same edge concepts with different keys, so :func:`pick`
+    frequently finds none of its candidates — a Caddy route has no ``rule``, an
+    HAProxy backend has no ``provider``. "This proxy does not express that
+    concept" is a different fact from "the field is blank", and only the second
+    should read as empty.
+
+    Use this for anything read via :func:`pick` or out of a response row; keep
+    :func:`s` for values that always exist (an exception message, a caller
+    argument).
+    """
+    return opt_str(value, limit)
 
 
 def pick(row: dict, *keys: str, default: Any = None) -> Any:

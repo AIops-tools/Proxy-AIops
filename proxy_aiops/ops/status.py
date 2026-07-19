@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from proxy_aiops.ops._util import as_obj, pick, s
+from proxy_aiops.ops._util import as_obj, opt, pick, s
 from proxy_aiops.platform import CADDY, HAPROXY, TRAEFIK, UnsupportedOperation
 
 
@@ -29,15 +29,15 @@ def version_info(conn: Any) -> dict:
         system = as_obj(obj.get("system"))
         return {
             "platform": conn.target.platform,
-            "version": s(pick(api, "version", default="")),
-            "buildDate": s(pick(api, "build_date", default="")),
-            "systemVersion": s(pick(system, "version", default="")),
+            "version": opt(pick(api, "version", default="")),
+            "buildDate": opt(pick(api, "build_date", default="")),
+            "systemVersion": opt(pick(system, "version", default="")),
         }
     return {
         "platform": conn.target.platform,
-        "version": s(pick(obj, "Version", "version")),
-        "codename": s(pick(obj, "Codename", "codename")),
-        "startDate": s(pick(obj, "startDate", "start_date")),
+        "version": opt(pick(obj, "Version", "version")),
+        "codename": opt(pick(obj, "Codename", "codename")),
+        "startDate": opt(pick(obj, "startDate", "start_date")),
     }
 
 
@@ -48,7 +48,7 @@ def list_entrypoints(conn: Any) -> dict:
         if conn.target.platform == TRAEFIK:
             rows = conn.platform.rows(conn.get(conn.platform.path("entrypoints")))
             eps = [
-                {"name": s(pick(r, "name")), "address": s(pick(r, "address"))}
+                {"name": opt(pick(r, "name")), "address": opt(pick(r, "address"))}
                 for r in rows
             ]
         elif conn.target.platform == CADDY:
@@ -62,9 +62,9 @@ def list_entrypoints(conn: Any) -> dict:
             rows = conn.platform.rows(conn.get(conn.platform.path("frontends")))
             eps = [
                 {
-                    "name": s(pick(r, "name")),
-                    "address": s(pick(r, "default_backend", default="")),
-                    "mode": s(pick(r, "mode", default="")),
+                    "name": opt(pick(r, "name")),
+                    "address": opt(pick(r, "default_backend", default="")),
+                    "mode": opt(pick(r, "mode", default="")),
                 }
                 for r in rows
             ]

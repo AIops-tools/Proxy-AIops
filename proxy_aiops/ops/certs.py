@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from proxy_aiops.ops import routes as route_ops
-from proxy_aiops.ops._util import as_obj, s
+from proxy_aiops.ops._util import as_obj, opt, s
 from proxy_aiops.platform import CADDY, TRAEFIK, UnsupportedOperation
 
 _PROBE_TIMEOUT_SEC = 5.0
@@ -42,7 +42,7 @@ def pull_tls_inventory(conn: Any) -> list[dict]:
             tls = r.get("tls")
             if tls is None:  # an EMPTY {} still means "TLS on" in traefik
                 continue
-            source = f"router {s(r.get('name'), 128)}"
+            source = f"router {opt(r.get('name'), 128)}"
             for host in parse_rule_hosts(str(r.get("rule", ""))):
                 if host in ("*", ""):  # HostSNI(`*`) is not a certificate domain
                     continue

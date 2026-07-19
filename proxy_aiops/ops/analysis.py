@@ -22,7 +22,7 @@ in the other ops modules, or injected) and they return the analysis.
 
 from __future__ import annotations
 
-from proxy_aiops.ops._util import num, s
+from proxy_aiops.ops._util import num, opt, s
 
 MAX_ROWS = 100
 
@@ -96,7 +96,7 @@ def backend_health_rca(upstreams: list[dict]) -> dict:
     """
     per_service: dict[str, dict] = {}
     for u in upstreams or []:
-        service = s(u.get("service") or "(default)", 200)
+        service = opt(u.get("service") or "(default)", 200)
         bucket = per_service.setdefault(
             service,
             {"service": service, "serversTotal": 0, "up": 0, "down": 0,
@@ -112,9 +112,9 @@ def backend_health_rca(upstreams: list[dict]) -> dict:
             bucket["down"] += 1
             bucket["checks"].append(str(u.get("checkInfo") or ""))
             bucket["failingServers"].append({
-                "server": s(u.get("server"), 200),
-                "address": s(u.get("address"), 200),
-                "checkInfo": s(u.get("checkInfo"), 64),
+                "server": opt(u.get("server"), 200),
+                "address": opt(u.get("address"), 200),
+                "checkInfo": opt(u.get("checkInfo"), 64),
             })
 
     findings = []
@@ -188,8 +188,8 @@ def cert_expiry_sweep(
     for c in certs or []:
         if "daysToExpiry" not in c or c.get("daysToExpiry") is None:
             unknown.append({
-                "domain": s(c.get("domain"), 128),
-                "error": s(c.get("error") or "no expiry data (probe skipped/failed)", 160),
+                "domain": opt(c.get("domain"), 128),
+                "error": opt(c.get("error") or "no expiry data (probe skipped/failed)", 160),
             })
             continue
         days = num(c.get("daysToExpiry"))
@@ -202,9 +202,9 @@ def cert_expiry_sweep(
         else:
             bucket = "ok"
         ranked.append({
-            "domain": s(c.get("domain"), 128),
+            "domain": opt(c.get("domain"), 128),
             "daysToExpiry": days,
-            "notAfter": s(c.get("notAfter"), 64),
+            "notAfter": opt(c.get("notAfter"), 64),
             "bucket": bucket,
         })
     ranked.sort(key=lambda c: c["daysToExpiry"])
@@ -286,7 +286,7 @@ def error_rate_rca(
         fleet_5xx += five
         rate = (five / total * 100) if total else 0.0
         rows.append({
-            "service": s(c.get("service"), 200),
+            "service": opt(c.get("service"), 200),
             "requestsTotal": total,
             "errors5xx": five,
             "errorRatePct": round(rate, 2),
@@ -407,8 +407,8 @@ def route_conflict_analysis(
                 continue  # a match-all catch-all is usually intentional (default route)
             if _covers(earlier, route):
                 shadowed.append({
-                    "route": s(route.get("name"), 200),
-                    "shadowedBy": s(earlier.get("name"), 200),
+                    "route": opt(route.get("name"), 200),
+                    "shadowedBy": opt(earlier.get("name"), 200),
                     "hosts": route.get("hosts") or [],
                     "paths": route.get("paths") or [],
                 })
@@ -424,13 +424,13 @@ def route_conflict_analysis(
             svc = known.get(service)
             if svc is None:
                 dead.append({
-                    "route": s(route.get("name"), 200),
+                    "route": opt(route.get("name"), 200),
                     "service": s(service, 200),
                     "reason": "service not found",
                 })
             elif num(svc.get("serversTotal")) and num(svc.get("serversUp")) == 0:
                 dead.append({
-                    "route": s(route.get("name"), 200),
+                    "route": opt(route.get("name"), 200),
                     "service": s(service, 200),
                     "reason": "service has zero servers up",
                 })
@@ -438,14 +438,14 @@ def route_conflict_analysis(
     loops = []
     redirectors = [r for r in ordered if r.get("redirectTo")]
     for route in redirectors:
-        hops = [s(route.get("name"), 200)]
+        hops = [opt(route.get("name"), 200)]
         current = route
         for _ in range(_MAX_REDIRECT_HOPS):
             host, path = _split_url(current.get("redirectTo"))
             nxt = _match_redirect(host, path, ordered)
             if nxt is None or not nxt.get("redirectTo"):
                 break
-            name = s(nxt.get("name"), 200)
+            name = opt(nxt.get("name"), 200)
             if name in hops:
                 loops.append({"chain": hops + [name], "startsAt": hops[0]})
                 break

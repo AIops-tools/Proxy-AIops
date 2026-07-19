@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from proxy_aiops.ops._util import s
+from proxy_aiops.ops._util import opt, s
 from proxy_aiops.platform import HAPROXY, TRAEFIK
 
 MAX_SERVICES = 200
@@ -70,8 +70,8 @@ def _traefik_counters(conn: Any) -> list[dict]:
         if sample["metric"] != _REQUESTS_METRIC:
             continue
         labels = sample["labels"]
-        service = s(labels.get("service", "(unknown)"), 200)
-        code = s(labels.get("code", "?"), 8)
+        service = opt(labels.get("service", "(unknown)"), 200)
+        code = opt(labels.get("code", "?"), 8)
         bucket = by_service.setdefault(service, {"service": service, "total": 0.0, "codes": {}})
         bucket["total"] += sample["value"]
         bucket["codes"][code] = bucket["codes"].get(code, 0.0) + sample["value"]
@@ -112,9 +112,13 @@ def error_counters(conn: Any) -> dict:
             # Raises UnsupportedOperation with the teaching message.
             conn.platform.path("stats")
             counters = []
+        kept = counters[:MAX_SERVICES]
         return {
             "platform": conn.target.platform,
-            "services": counters[:MAX_SERVICES],
+            "services": kept,
+            "returned": len(kept),
+            "limit": MAX_SERVICES,
+            "truncated": len(counters) > MAX_SERVICES,
             "total": len(counters),
             "note": "Counters are cumulative since proxy start — compare rates, not raw totals.",
         }
@@ -169,10 +173,14 @@ def traffic_stats(conn: Any) -> dict:
             conn.platform.path("stats")  # raises the teaching error for caddy
             stats = []
         stats.sort(key=lambda r: r.get("requestsTotal", 0), reverse=True)
+        kept = stats[:MAX_SERVICES]
         return {
             "platform": conn.target.platform,
+            "services": kept,
+            "returned": len(kept),
+            "limit": MAX_SERVICES,
+            "truncated": len(stats) > MAX_SERVICES,
             "total": len(stats),
-            "services": stats[:MAX_SERVICES],
         }
     except Exception as exc:  # noqa: BLE001 — report as partial (incl. teaching)
         return {"error": s(exc, 400)}

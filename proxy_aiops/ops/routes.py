@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from proxy_aiops.ops._util import as_obj, num, parse_rule_hosts, parse_rule_paths, pick, s
+from proxy_aiops.ops._util import as_obj, num, opt, parse_rule_hosts, parse_rule_paths, pick, s
 from proxy_aiops.platform import CADDY, TRAEFIK
 
 MAX_ROUTES = 500
@@ -29,32 +29,34 @@ def _traefik_routes(conn: Any) -> list[dict]:
     for r in rows:
         rule = str(pick(r, "rule", default=""))
         out.append({
-            "name": s(pick(r, "name")),
+            "name": opt(pick(r, "name")),
             "platform": TRAEFIK,
             "hosts": [s(h, 128) for h in parse_rule_hosts(rule)],
             "paths": [s(p, 128) for p in parse_rule_paths(rule)],
             "priority": num(pick(r, "priority", default=0)),
-            "service": s(pick(r, "service")),
+            "service": opt(pick(r, "service")),
             # Traefik marks a TLS router with a "tls" object that is often
             # EMPTY ({}) — presence, not truthiness, is the signal.
             "tls": r.get("tls") is not None,
             "enabled": str(pick(r, "status", default="enabled")).lower() != "disabled",
             "entryPoints": [s(e, 64) for e in (pick(r, "entryPoints", default=[]) or [])],
-            "redirectTo": "",
-            "raw": s(rule, 300),
+            # Traefik expresses redirects as middleware, not on the router, so
+            # this normaliser has nothing to report — null, not "no redirect".
+            "redirectTo": None,
+            "raw": opt(pick(r, "rule"), 300),
         })
     return out
 
 
-def _caddy_redirect_target(handlers: list) -> str:
-    """A static_response with a Location header is a redirect."""
+def _caddy_redirect_target(handlers: list) -> str | None:
+    """The redirect target, or None when this route is not a redirect at all."""
     for h in handlers or []:
         h = as_obj(h)
         if h.get("handler") == "static_response":
             locs = as_obj(h.get("headers")).get("Location") or []
             if locs:
                 return str(locs[0])
-    return ""
+    return None
 
 
 def _caddy_service(handlers: list) -> str:
@@ -102,8 +104,8 @@ def _caddy_routes(conn: Any) -> list[dict]:
                 "tls": tls_ish,
                 "enabled": True,
                 "entryPoints": [s(a, 64) for a in listen],
-                "redirectTo": s(_caddy_redirect_target(handlers)),
-                "raw": "",
+                "redirectTo": opt(_caddy_redirect_target(handlers)),
+                "raw": None,
             })
     return out
 
@@ -112,17 +114,17 @@ def _haproxy_routes(conn: Any) -> list[dict]:
     rows = conn.platform.rows(conn.get(conn.platform.path("frontends")))
     return [
         {
-            "name": s(pick(r, "name")),
+            "name": opt(pick(r, "name")),
             "platform": "haproxy",
             "hosts": [],
             "paths": [],
             "priority": 0.0,
-            "service": s(pick(r, "default_backend", default="")),
+            "service": opt(pick(r, "default_backend", default="")),
             "tls": False,
             "enabled": str(pick(r, "enabled", default="enabled")).lower() != "disabled",
             "entryPoints": [],
-            "redirectTo": "",
-            "raw": s(pick(r, "mode", default=""), 64),
+            "redirectTo": None,
+            "raw": opt(pick(r, "mode"), 64),
             "note": "Host/path matching lives in haproxy.cfg ACLs "
                     "(not statically analysable here).",
         }

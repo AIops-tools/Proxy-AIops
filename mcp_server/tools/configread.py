@@ -31,6 +31,10 @@ def search_config(query: str, target: Optional[str] = None) -> dict:
     Args:
         query: Case-insensitive substring to find in keys and values.
         target: Proxy target name from config; omit for the default.
+
+    Returns an envelope: {"matches": [...], "returned": N, "limit": L,
+    "truncated": bool}. When "truncated" is true there is more than was
+    returned — narrow the query rather than treating these as every match.
     """
     return ops.search_config(_get_connection(target), query)
 

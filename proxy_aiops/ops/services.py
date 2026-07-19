@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from proxy_aiops.ops import routes as route_ops
-from proxy_aiops.ops._util import as_obj, num, pick, s
+from proxy_aiops.ops._util import as_obj, num, opt, pick, s
 from proxy_aiops.platform import CADDY, HAPROXY, TRAEFIK, UnsupportedOperation
 
 MAX_ROWS = 500
@@ -31,13 +31,13 @@ def _traefik_services(conn: Any) -> list[dict]:
         servers = lb.get("servers") or []
         status_map = as_obj(pick(r, "serverStatus", default={}))
         out.append({
-            "name": s(pick(r, "name")),
+            "name": opt(pick(r, "name")),
             "platform": TRAEFIK,
-            "type": s(pick(r, "type", default="loadBalancer")),
+            "type": opt(pick(r, "type", default="loadBalancer")),
             "serversTotal": len(servers) or len(status_map),
             "serversUp": sum(1 for v in status_map.values() if str(v).upper() == "UP"),
             "usedBy": [s(u, 128) for u in (pick(r, "usedBy", default=[]) or [])],
-            "status": s(pick(r, "status", default="")),
+            "status": opt(pick(r, "status", default="")),
         })
     return out
 
@@ -84,16 +84,16 @@ def _haproxy_services(conn: Any) -> list[dict]:
             bucket["up"] += 1
     out = []
     for r in rows:
-        name = s(pick(r, "name"))
+        name = opt(pick(r, "name"))
         counts = per_backend.get(name, {"total": 0, "up": 0})
         out.append({
             "name": name,
             "platform": HAPROXY,
-            "type": s(pick(r, "mode", default="http")),
+            "type": opt(pick(r, "mode", default="http")),
             "serversTotal": counts["total"],
             "serversUp": counts["up"],
             "usedBy": [],
-            "status": s(pick(r, "balance", default=""), 64),
+            "status": opt(pick(r, "balance", default=""), 64),
         })
     return out
 
@@ -148,7 +148,7 @@ def _traefik_upstreams(conn: Any) -> list[dict]:
     rows = conn.platform.rows(conn.get(conn.platform.path("services")))
     out = []
     for r in rows:
-        name = s(pick(r, "name"))
+        name = opt(pick(r, "name"))
         status_map = as_obj(pick(r, "serverStatus", default={}))
         lb_servers = [
             str(as_obj(srv).get("url", ""))
@@ -178,8 +178,8 @@ def _caddy_upstreams(conn: Any) -> list[dict]:
         fails = int(num(pick(r, "fails", default=0)))
         out.append({
             "service": "",
-            "server": s(pick(r, "address"), 200),
-            "address": s(pick(r, "address"), 200),
+            "server": opt(pick(r, "address"), 200),
+            "address": opt(pick(r, "address"), 200),
             "status": "down" if fails > 0 else "up",
             "adminState": "",
             "checkInfo": f"fails={fails}" if fails else "",
@@ -210,12 +210,12 @@ def _haproxy_stat_rows(conn: Any) -> list[dict]:
             else:
                 status = "unknown"
             out.append({
-                "name": s(pick(row, "name")),
-                "backend": s(pick(row, "backend_name", default="")),
-                "type": s(pick(row, "type", default="")),
+                "name": opt(pick(row, "name")),
+                "backend": opt(pick(row, "backend_name", default="")),
+                "type": opt(pick(row, "type", default="")),
                 "status": status,
-                "checkStatus": s(pick(stats, "check_status", default=""), 64),
-                "address": s(pick(stats, "addr", default=""), 200),
+                "checkStatus": opt(pick(stats, "check_status", default=""), 64),
+                "address": opt(pick(stats, "addr", default=""), 200),
                 "weight": num(pick(stats, "weight", default=0)),
                 "requestsTotal": num(pick(stats, "req_tot", default=0)),
                 "hrsp2xx": num(pick(stats, "hrsp_2xx", default=0)),
@@ -290,9 +290,9 @@ def list_middlewares(conn: Any) -> dict:
         rows = conn.platform.rows(conn.get(conn.platform.path("middlewares")))
         mws = [
             {
-                "name": s(pick(r, "name")),
-                "type": s(pick(r, "type", default="")),
-                "status": s(pick(r, "status", default="")),
+                "name": opt(pick(r, "name")),
+                "type": opt(pick(r, "type", default="")),
+                "status": opt(pick(r, "status", default="")),
                 "usedBy": [s(u, 128) for u in (pick(r, "usedBy", default=[]) or [])],
             }
             for r in rows

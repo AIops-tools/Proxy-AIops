@@ -50,7 +50,13 @@ def config_search(
     from proxy_aiops.ops import configread as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.search_config(conn, query)))
+    result = ops.search_config(conn, query)
+    console.print_json(json.dumps(result))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… truncated at {result.get('limit')} matches — "
+            f"narrow the query to see the rest.[/yellow]"
+        )
 
 
 @config_app.command("get")

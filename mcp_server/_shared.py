@@ -77,7 +77,7 @@ def tool_errors(shape: str = "dict") -> Callable:
 mcp = FastMCP(
     "proxy-aiops",
     instructions=(
-        "Reverse-proxy / load-balancer operations (preview) over Traefik, Caddy "
+        "Reverse-proxy / load-balancer operations over Traefik, Caddy "
         "and HAProxy: version/entrypoints, routes (routers / caddy routes / "
         "frontends), services and server-level upstream health, middlewares, "
         "TLS certificate inventory, traffic/error counters, and config "

@@ -1,26 +1,49 @@
-# Release notes — proxy-aiops 0.3.1
+# Release notes — proxy-aiops 0.4.0
 
-Previous release: 0.3.0.
+Previous release: 0.3.1.
 
-## Fixed: the HAProxy branch could not talk to any current HAProxy
+## In this tool
 
-Every HAProxy path was hardcoded to Data Plane API **v2**. HAProxy 3.x ships
-Data Plane API v3, which serves **only** `/v3` — every `/v2` path returns 404.
-So the whole HAProxy platform branch was unusable against a current HAProxy,
-failing at the very first probe.
+- **Caddy config writes refuse the `admin` subtree.** The Caddy admin API is this tool's own transport, and `admin` is an ordinary top-level key in the config tree — so `set_config_value("admin/disabled", true)` tore down the listener mid-request and left the undo with nowhere to go. `load_config` likewise refuses a config that disables admin or moves its listener. The tool's own troubleshooting guide already listed this as a terminal state; it just did not stop itself causing it.
 
-The path registry now holds v3 paths, and the connection probes `/v3/info` once
-per connection and rewrites the prefix to `/v2` when it sees an older server.
-Both generations work; the probe is cached, so a v3 server costs one extra
-request per connection and a v2 server two.
+## Every tool in the line: previews and undetermined outcomes
 
-## Live-verified: HAProxy
+This release fixes three harness defects that were silently degrading the audit
+trail and the undo store.
 
-Verified against **HAProxy 3.0.25 with Data Plane API v3.0.21**: `doctor`, plus
-reads cross-checked against the Data Plane API itself — the configured backend
-and its two servers were reported accurately, including `serversUp: 0` for
-servers pointed at closed ports.
+**A write that loses its response is no longer recorded as a failure.** The
+harness assumed a sanitized error meant nothing had happened. That assumption is
+false in exactly the case that matters most: when a write severs its own
+connection, the request has already landed, the response cannot come back, and
+the operation was recorded as `status=error` with **no undo token created at
+all**. Transport-level failures are now audited as `status=unknown`, the result
+says plainly that the operation may have taken effect and should be verified
+before retrying, and a write that stashed its before-state has its inverse
+recorded anyway — flagged `effectVerified: false`, which `undo_list` and
+`undo_apply` both surface. Existing `undo.db` files are migrated in place; their
+rows read as verified, which is accurate, since the old code only ever recorded
+on the confirmed path.
 
-With Traefik 3.2.5 and Caddy 2 verified in 0.3.0, **all three platforms are now
-live-verified**. See [docs/VERIFICATION.md](docs/VERIFICATION.md) — guarded
-config writes and TLS/certificate expiry against real certificates remain open.
+**A dry-run no longer writes an undo token.** Previews were recording inverses
+built from a before-state they never had: the undo callback's permissive default
+filled the gap with a guess, producing a real, applicable token for an operation
+that never happened.
+
+**A dry-run no longer demands a named approver.** Requiring an approval in order
+to ask whether something needs approval inverts what a preview is for. The tier
+is still computed and still audited, so the preview can tell you an approver
+will be needed; it just no longer refuses to answer. The write itself is gated
+exactly as before.
+
+The invariant, now stated: **a dry_run may read; it must never write.** Guards
+run on the preview path, which means a preview can and does report that an
+operation would be refused.
+
+## Also line-wide
+
+- **Truncated text now ends in an ellipsis** instead of being cut silently. This
+  line already treats a silent cut as a defect for lists; it was doing exactly
+  that to strings.
+- **Error messages are capped at 800 characters, not 300.** These messages end
+  with what to do instead, so the cap was removing the most useful sentence of
+  every long refusal.

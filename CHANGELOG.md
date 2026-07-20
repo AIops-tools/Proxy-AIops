@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.4.0 — 2026-07-20
+
+### Fixed
+- **Caddy config writes refuse the `admin` subtree.** The Caddy admin API is this tool's own transport, and `admin` is an ordinary top-level key in the config tree — so `set_config_value("admin/disabled", true)` tore down the listener mid-request and left the undo with nowhere to go.
+- Harness: a write whose response is lost is audited `status=unknown`, not `error` — it may have taken effect. Undo tokens gain `effectVerified` (undo.db migrated in place).
+- Harness: a dry-run no longer records an undo token, and no longer requires a named approver. Guards now run on the preview path.
+- Truncated strings end in an ellipsis instead of being cut silently; error messages are capped at 800 chars, not 300.
+
+See RELEASE_NOTES.md for the full detail.
+
 All notable changes to proxy-aiops are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 

@@ -18,7 +18,7 @@ from proxy_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
     get_connection,
 )
 
@@ -88,8 +88,12 @@ def config_set(
     except json.JSONDecodeError as exc:
         raise ValueError(f"value must be valid JSON: {exc}") from exc
     if dry_run:
-        dry_run_print(operation="set_config_value", api_call=f"PATCH /config/{path}",
-                      parameters={"path": path, "value": value})
+        # Through the governed call: set_config_value refuses the admin subtree,
+        # so a preview must report that rather than a green banner.
+        dry_run_preview(
+            gov.set_config_value(path=path, value=parsed, dry_run=True, target=target),
+            operation="set_config_value", api_call=f"PATCH /config/{path}",
+            parameters={"path": path, "value": value})
         return
     double_confirm("set config value at", path)
     console.print_json(json.dumps(gov.set_config_value(path=path, value=parsed, target=target)))
@@ -106,8 +110,12 @@ def config_delete(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="delete_config_path", api_call=f"DELETE /config/{path}",
-                      parameters={"path": path})
+        # Through the governed call: delete_config_path refuses the admin subtree
+        # and the config root, so a preview must report that.
+        dry_run_preview(
+            gov.delete_config_path(path=path, dry_run=True, target=target),
+            operation="delete_config_path", api_call=f"DELETE /config/{path}",
+            parameters={"path": path})
         return
     double_confirm("delete config path", path)
     console.print_json(json.dumps(gov.delete_config_path(path=path, target=target)))

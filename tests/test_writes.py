@@ -233,17 +233,26 @@ def test_write_risk_tiers():
 def test_dry_run_previews_do_not_mutate(monkeypatch):
     from mcp_server.tools import writes as t
 
-    conn = _conn(CADDY)
+    conn = _conn(CADDY, {"/config/": {"admin": {"listen": "127.0.0.1:2019"},
+                                      "apps": {}}})
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
 
     assert t.set_config_value(path="a/b", value=1, dry_run=True)["dryRun"] is True
     assert t.delete_config_path(path="a/b", dry_run=True)["dryRun"] is True
-    assert t.load_config(config={"apps": {}}, dry_run=True)["dryRun"] is True
     assert t.set_server_state(backend="b", server="s", state="drain",
                               dry_run=True)["dryRun"] is True
     assert t.set_server_weight(backend="b", server="s", weight=1,
                                dry_run=True)["dryRun"] is True
+    # Previews whose guard is static (or absent) touch nothing at all.
     conn.get.assert_not_called()
+
+    # load_config IS guarded by a comparison against the live config, so its
+    # preview pays the same config_root GET the real call makes. A preview that
+    # costs a read and tells the truth beats a free one that reports a green
+    # 'wouldLoad' for a call that is about to be refused.
+    assert t.load_config(config={"apps": {}}, dry_run=True)["dryRun"] is True
+
+    # No preview, guarded or not, may ever mutate.
     conn.patch.assert_not_called()
     conn.post.assert_not_called()
     conn.put.assert_not_called()

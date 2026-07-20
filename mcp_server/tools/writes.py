@@ -131,6 +131,12 @@ def set_config_value(
     Caddy applies the change immediately. On traefik/haproxy this raises the
     support matrix's teaching error. Pass dry_run=True to preview.
 
+    Refuses the 'admin' subtree: that configures the admin API this tool speaks
+    to, so disabling or moving it would end the connection the undo needs.
+    Change the admin block in caddy's own config file and reload locally. The
+    refusal applies under dry_run too — a preview whose real call would be
+    refused must report that, not a green 'wouldSet'.
+
     Args:
         path: Slash-separated config path (from search_config / list_routes,
             e.g. apps/http/servers/srv0/routes/0/handle/0/upstreams).
@@ -139,6 +145,9 @@ def set_config_value(
         target: Proxy target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Ahead of the dry_run return: a preview whose real call would be refused
+    # must say so, or the caller reads the refusal as transient and retries.
+    ops.guard_set_config_value(conn, path, value)
     if dry_run:
         return {"dryRun": True, "wouldSet": {"path": path, "value": value}}
     return ops.set_config_value(conn, path, value)
@@ -158,12 +167,20 @@ def delete_config_path(
     Requires an approver (PROXY_AUDIT_APPROVED_BY) under the
     graduated-autonomy policy. Pass dry_run=True to preview.
 
+    Refuses the 'admin' subtree and the config root: both remove the admin API
+    this tool speaks to, leaving the undo with no way to reach the server. The
+    refusal applies under dry_run too, which must report it rather than preview
+    a call that will be refused.
+
     Args:
         path: Slash-separated config path to delete.
         dry_run: If True, preview without deleting.
         target: Proxy target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Ahead of the dry_run return: a preview whose real call would be refused
+    # must say so, or the caller reads the refusal as transient and retries.
+    ops.guard_delete_config_path(path)
     if dry_run:
         return {"dryRun": True, "wouldDelete": {"path": path}}
     return ops.delete_config_path(conn, path)
@@ -183,12 +200,20 @@ def load_config(
     Requires an approver (PROXY_AUDIT_APPROVED_BY) under the
     graduated-autonomy policy. Pass dry_run=True to preview.
 
+    Refuses a config that disables the admin API or moves admin.listen off the
+    configured base_url — the undo re-POSTs the snapshot over that same API.
+    Send the admin block unchanged, or omit it. The refusal applies under
+    dry_run too, which must report it rather than preview a refused call.
+
     Args:
         config: The full config tree to load (a JSON object).
         dry_run: If True, preview without loading.
         target: Proxy target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Ahead of the dry_run return: costs the same config_root GET the real call
+    # makes, and in exchange the preview can never contradict it.
+    ops.guard_load_config(conn, config)
     if dry_run:
         return {"dryRun": True, "wouldLoad": {"topLevelKeys": sorted(config or {})}}
     return ops.load_config(conn, config)

@@ -71,11 +71,34 @@ def to_bool(value: Any) -> bool:
 
 
 def num(value: Any) -> float:
-    """Coerce a numeric cell to float; 0.0 when absent/non-numeric."""
+    """Coerce a numeric cell to float; 0.0 when absent/non-numeric.
+
+    Use only for genuinely fractional values (rates, durations). For integer
+    quantities — request counts, session counts, route priority — use
+    :func:`as_int`.
+    """
     try:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def as_int(value: Any) -> int:
+    """Coerce an integer quantity to ``int``; 0 when absent/non-numeric.
+
+    Route priority is an int64 in Traefik: routing it through :func:`num` both
+    rendered it in scientific notation (``9.223372036854776e+18``) *and* lost
+    precision, since a float64 cannot represent 2**63-1 exactly. Counters have
+    the same problem in miniature — a request total is never fractional.
+    """
+    if isinstance(value, bool):  # bool is an int subclass; not a quantity
+        return 0
+    if isinstance(value, int):
+        return value  # already exact — never round-trip through float64
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 # ── Traefik rule-string parsing ──────────────────────────────────────────────

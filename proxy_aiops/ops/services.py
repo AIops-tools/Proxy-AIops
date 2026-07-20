@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from proxy_aiops.ops import routes as route_ops
-from proxy_aiops.ops._util import as_obj, num, opt, pick, s
+from proxy_aiops.ops._util import as_int, as_obj, num, opt, pick, s
 from proxy_aiops.platform import CADDY, HAPROXY, TRAEFIK, UnsupportedOperation
 
 MAX_ROWS = 500
@@ -216,14 +216,14 @@ def _haproxy_stat_rows(conn: Any) -> list[dict]:
                 "status": status,
                 "checkStatus": opt(pick(stats, "check_status", default=""), 64),
                 "address": opt(pick(stats, "addr", default=""), 200),
-                "weight": num(pick(stats, "weight", default=0)),
-                "requestsTotal": num(pick(stats, "req_tot", default=0)),
+                "weight": as_int(pick(stats, "weight", default=0)),
+                "requestsTotal": as_int(pick(stats, "req_tot", default=0)),
                 "hrsp2xx": num(pick(stats, "hrsp_2xx", default=0)),
                 "hrsp4xx": num(pick(stats, "hrsp_4xx", default=0)),
                 "hrsp5xx": num(pick(stats, "hrsp_5xx", default=0)),
-                "currentSessions": num(pick(stats, "scur", default=0)),
+                "currentSessions": as_int(pick(stats, "scur", default=0)),
                 "rate": num(pick(stats, "rate", default=0)),
-                "lastStatusChange": num(pick(stats, "lastchg", default=0)),
+                "lastStatusChange": as_int(pick(stats, "lastchg", default=0)),
             })
     return out
 

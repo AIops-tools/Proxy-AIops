@@ -17,7 +17,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from proxy_aiops.ops._util import as_obj, num, opt, parse_rule_hosts, parse_rule_paths, pick, s
+from proxy_aiops.ops._util import (
+    as_int,
+    as_obj,
+    opt,
+    parse_rule_hosts,
+    parse_rule_paths,
+    pick,
+    s,
+)
 from proxy_aiops.platform import CADDY, TRAEFIK
 
 MAX_ROUTES = 500
@@ -33,7 +41,7 @@ def _traefik_routes(conn: Any) -> list[dict]:
             "platform": TRAEFIK,
             "hosts": [s(h, 128) for h in parse_rule_hosts(rule)],
             "paths": [s(p, 128) for p in parse_rule_paths(rule)],
-            "priority": num(pick(r, "priority", default=0)),
+            "priority": as_int(pick(r, "priority", default=0)),
             "service": opt(pick(r, "service")),
             # Traefik marks a TLS router with a "tls" object that is often
             # EMPTY ({}) — presence, not truthiness, is the signal.
@@ -99,7 +107,7 @@ def _caddy_routes(conn: Any) -> list[dict]:
                 "platform": CADDY,
                 "hosts": [s(h, 128) for h in hosts],
                 "paths": [s(p, 128) for p in paths],
-                "priority": 0.0,
+                "priority": 0,
                 "service": s(_caddy_service(handlers)),
                 "tls": tls_ish,
                 "enabled": True,
@@ -118,7 +126,7 @@ def _haproxy_routes(conn: Any) -> list[dict]:
             "platform": "haproxy",
             "hosts": [],
             "paths": [],
-            "priority": 0.0,
+            "priority": 0,
             "service": opt(pick(r, "default_backend", default="")),
             "tls": False,
             "enabled": str(pick(r, "enabled", default="enabled")).lower() != "disabled",

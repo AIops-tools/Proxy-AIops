@@ -44,9 +44,11 @@ def test_path_templates_differ_per_platform():
     ha = get_platform(HAPROXY)
     assert tr.path("routers") == "/api/http/routers"
     assert tr.path("router_detail", name="web@file").endswith("/web%40file")
-    assert ha.path("backends") == "/v2/services/haproxy/configuration/backends"
+    # The registry holds Data Plane API **v3** paths (HAProxy 3.x serves only
+    # /v3); the connection rewrites them to /v2 for an older server.
+    assert ha.path("backends") == "/v3/services/haproxy/configuration/backends"
     assert ha.path("runtime_server", name="web1", backend="app") == (
-        "/v2/services/haproxy/runtime/servers/web1?backend=app"
+        "/v3/services/haproxy/runtime/servers/web1?backend=app"
     )
     assert get_platform(CADDY).path("config_load") == "/load"
 

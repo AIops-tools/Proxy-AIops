@@ -3,7 +3,9 @@
 This document records what has and has not been validated against real reverse
 proxies, so the maturity claim is auditable rather than a vibe.
 
-## Already live-verified ✅ — Traefik 3.2.5 and Caddy 2 (2026-07-20)
+## Already live-verified ✅ — all three platforms (2026-07-20)
+
+Traefik 3.2.5, Caddy 2, and HAProxy 3.0.25 (Data Plane API v3.0.21).
 
 - `doctor` against both live endpoints (unauthenticated admin APIs, as the tool
   documents for traefik/caddy).
@@ -22,9 +24,11 @@ that never round-trips through float64.
 
 ## Not yet live-verified ⚠️
 
-- **HAProxy** — the whole platform branch. It talks to the Data Plane API, which
-  needs a `program api` section in `haproxy.cfg` plus a dataplaneapi binary; that
-  setup was not built for this round. This is now the largest gap in this repo.
+- **HAProxy is now verified** — and that run found the branch was **entirely
+  broken**: every path was hardcoded to Data Plane API v2, but HAProxy 3.x serves
+  only `/v3`, so the first probe 404'd. The connection now detects the API
+  generation and supports both. Still untested there: runtime server state changes
+  and the stats-derived traffic analyses under real load.
 - **TLS / certificate expiry** (`certs`) against real certificates — both verified
   instances served plaintext on a lab port.
 - **Guarded config writes** (`config set/delete`) and their undo paths.

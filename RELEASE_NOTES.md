@@ -1,27 +1,26 @@
-# Release notes — proxy-aiops 0.3.0
+# Release notes — proxy-aiops 0.3.1
 
-Previous release: 0.2.0.
+Previous release: 0.3.0.
 
-## Fixed: route priority lost precision and collapsed distinct values
+## Fixed: the HAProxy branch could not talk to any current HAProxy
 
-Traefik route priority is an int64. Routing it through the float helper rendered it
-in scientific notation (`9.223372036854776e+18`) *and* lost precision, because a
-float64 cannot represent values near 2**63 exactly.
+Every HAProxy path was hardcoded to Data Plane API **v2**. HAProxy 3.x ships
+Data Plane API v3, which serves **only** `/v3` — every `/v2` path returns 404.
+So the whole HAProxy platform branch was unusable against a current HAProxy,
+failing at the very first probe.
 
-The practical consequence, seen on a live Traefik: two routers with **different**
-priorities (…806 and …805) displayed as the **same** number. Route priority decides
-matching order, so this actively misleads anyone debugging which route wins.
+The path registry now holds v3 paths, and the connection probes `/v3/info` once
+per connection and rewrites the prefix to `/v2` when it sees an older server.
+Both generations work; the probe is cached, so a v3 server costs one extra
+request per connection and a v2 server two.
 
-Integer quantities — route priority, server weight, request totals, session counts —
-now use an exact `as_int` that returns an existing `int` untouched instead of
-round-tripping it through float64. Genuinely fractional values are unchanged.
+## Live-verified: HAProxy
 
-If you parse these fields, the JSON changes from `9.223372036854776e+18` to
-`9223372036854775806`, and counters from `12.0` to `12`.
+Verified against **HAProxy 3.0.25 with Data Plane API v3.0.21**: `doctor`, plus
+reads cross-checked against the Data Plane API itself — the configured backend
+and its two servers were reported accurately, including `serversUp: 0` for
+servers pointed at closed ports.
 
-## Live-verified
-
-Against **Traefik 3.2.5** and **Caddy 2**: reads cross-checked against each proxy's
-own API, plus the three analyses. See [docs/VERIFICATION.md](docs/VERIFICATION.md) —
-**HAProxy remains unverified** (its Data Plane API setup was not built for this
-round) and is now the largest gap here.
+With Traefik 3.2.5 and Caddy 2 verified in 0.3.0, **all three platforms are now
+live-verified**. See [docs/VERIFICATION.md](docs/VERIFICATION.md) — guarded
+config writes and TLS/certificate expiry against real certificates remain open.

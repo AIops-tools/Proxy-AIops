@@ -18,7 +18,7 @@ v0.1 registers three platforms:
     read via ``GET /config/``, targeted config writes via ``PATCH/POST/DELETE
     /config/<path>`` and full replace via ``POST /load``. This platform carries
     the write surface (prior-config capture → replayable undo).
-  * **haproxy** — HAProxy Data Plane API v2 (``/v2/services/haproxy/...``,
+  * **haproxy** — HAProxy Data Plane API v3, with v2 fallback (``/v3/services/haproxy/...``,
     HTTP Basic auth): frontends/backends/servers/stats reads plus runtime
     server writes (admin state ready/drain/maint, weight).
 
@@ -288,19 +288,24 @@ _CADDY_UNSUPPORTED = {
     ),
 }
 
-# ─── HAProxy (Data Plane API v2, HTTP Basic auth) ────────────────────────────
+# ─── HAProxy (Data Plane API, HTTP Basic auth) ──────────────────────────────
+# Paths are written for Data Plane API **v3** (HAProxy 3.x). A v2 server is
+# still supported: the connection probes once and rewrites the /v3/ prefix to
+# /v2/ when it sees an older API. Verified live against dataplaneapi v3.0.21,
+# which serves ONLY /v3 — every /v2 path 404s, so hardcoding v2 (as this did)
+# made the whole HAProxy branch unusable on any current HAProxy.
 _HAPROXY_PATHS = {
-    "probe": "/v2/info",
-    "version": "/v2/info",
-    "frontends": "/v2/services/haproxy/configuration/frontends",
-    "frontend_detail": "/v2/services/haproxy/configuration/frontends/{name}",
-    "binds": "/v2/services/haproxy/configuration/binds?frontend={frontend}",
-    "backends": "/v2/services/haproxy/configuration/backends",
-    "backend_detail": "/v2/services/haproxy/configuration/backends/{name}",
-    "servers": "/v2/services/haproxy/configuration/servers?backend={backend}",
-    "runtime_servers": "/v2/services/haproxy/runtime/servers?backend={backend}",
-    "runtime_server": "/v2/services/haproxy/runtime/servers/{name}?backend={backend}",
-    "stats": "/v2/services/haproxy/stats/native",
+    "probe": "/v3/info",
+    "version": "/v3/info",
+    "frontends": "/v3/services/haproxy/configuration/frontends",
+    "frontend_detail": "/v3/services/haproxy/configuration/frontends/{name}",
+    "binds": "/v3/services/haproxy/configuration/binds?frontend={frontend}",
+    "backends": "/v3/services/haproxy/configuration/backends",
+    "backend_detail": "/v3/services/haproxy/configuration/backends/{name}",
+    "servers": "/v3/services/haproxy/configuration/servers?backend={backend}",
+    "runtime_servers": "/v3/services/haproxy/runtime/servers?backend={backend}",
+    "runtime_server": "/v3/services/haproxy/runtime/servers/{name}?backend={backend}",
+    "stats": "/v3/services/haproxy/stats/native",
 }
 _HAPROXY_UNSUPPORTED = {
     "metrics": (

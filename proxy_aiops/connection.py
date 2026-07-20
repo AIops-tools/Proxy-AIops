@@ -84,6 +84,8 @@ class ProxyConnection:
             auth=self._build_auth(target),
             headers={"Accept": "application/json"},
         )
+        # HAProxy Data Plane API generation, resolved lazily by _haproxy_path.
+        self._dpapi_prefix: str | None = None
 
     @staticmethod
     def _build_auth(target: TargetConfig) -> Any | None:
@@ -104,8 +106,29 @@ class ProxyConnection:
     def platform(self) -> Any:
         return self._target.platform_obj
 
+    def _haproxy_path(self, path: str) -> str:
+        """Rewrite a ``/v3/`` Data Plane API path to ``/v2/`` on an older server.
+
+        HAProxy 3.x ships Data Plane API v3, which serves **only** ``/v3`` — every
+        ``/v2`` path 404s. Older installs are the mirror image. The registry holds
+        the current (v3) paths and this probes ``/v3/info`` once per connection,
+        falling back to ``/v2`` so both generations work. Probed lazily and cached:
+        a v3 server costs one extra request per connection, a v2 server two.
+        """
+        if not path.startswith("/v3/"):
+            return path
+        if self._dpapi_prefix is None:
+            try:
+                resp = self._client.request("GET", "/v3/info")
+                self._dpapi_prefix = "/v3/" if resp.status_code < 400 else "/v2/"
+            except httpx.HTTPError:
+                self._dpapi_prefix = "/v3/"  # unreachable: let the real call report it
+        return self._dpapi_prefix + path[4:]
+
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         label = self._target.platform_obj.label
+        if self._target.platform == "haproxy":
+            path = self._haproxy_path(path)
         try:
             resp = self._client.request(method, path, **kwargs)
         except httpx.HTTPError as exc:

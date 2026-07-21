@@ -1,6 +1,6 @@
 """Governed proxy-write MCP tools (the only state-changing tools).
 
-Every tool is wrapped with the governance harness (audit + graduated approval
+Every tool is wrapped with the governance harness (audit + descriptive risk
 tier) and takes a ``dry_run`` preview. Reversible writes pass an ``undo=``
 callback that turns the fetched before-state into an inverse descriptor the
 harness records; the undo params match the target tool's own signature, so the
@@ -164,8 +164,7 @@ def delete_config_path(
     """[WRITE][risk=high] Delete a caddy config subtree; reversible — the
     subtree is captured first and the undo re-creates it.
 
-    Requires an approver (PROXY_AUDIT_APPROVED_BY) under the
-    graduated-autonomy policy. Pass dry_run=True to preview.
+    Pass dry_run=True to preview.
 
     Refuses the 'admin' subtree and the config root: both remove the admin API
     this tool speaks to, leaving the undo with no way to reach the server. The
@@ -197,8 +196,7 @@ def load_config(
     """[WRITE][risk=high] Replace caddy's FULL running config; reversible —
     the prior config is snapshotted first and the undo re-loads it.
 
-    Requires an approver (PROXY_AUDIT_APPROVED_BY) under the
-    graduated-autonomy policy. Pass dry_run=True to preview.
+    Pass dry_run=True to preview.
 
     Refuses a config that disables the admin API or moves admin.listen off the
     configured base_url — the undo re-POSTs the snapshot over that same API.
@@ -248,6 +246,10 @@ def set_server_state(
         target: Proxy target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Ahead of the dry_run return: off-platform (traefik/caddy) the real call
+    # raises the support matrix's teaching error, so the preview must too — a
+    # green 'wouldSetState' for a call that cannot run reads as transient.
+    state = ops.guard_set_server_state(conn, backend, server, state)
     if dry_run:
         return {
             "dryRun": True,
@@ -282,6 +284,9 @@ def set_server_weight(
         target: Proxy target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Ahead of the dry_run return: off-platform (traefik/caddy) the real call
+    # raises the support matrix's teaching error, so the preview must too.
+    weight = ops.guard_set_server_weight(conn, backend, server, weight)
     if dry_run:
         return {
             "dryRun": True,

@@ -134,7 +134,7 @@ def _refuse_admin_teardown(prior: Any, incoming: Any, action: str) -> None:
     )
 
 
-# The three guard_* helpers below are what the MCP wrappers call ahead of their
+# The guard_* helpers below are what the MCP wrappers call ahead of their
 # ``dry_run`` early return, and what the write functions themselves call. One
 # implementation per guard means a preview can never contradict the real call —
 # including its fail-open behaviour, which must be identical on both paths (a
@@ -280,6 +280,43 @@ def _runtime_server(conn: Any, backend: str, server: str) -> dict:
     return raw if isinstance(raw, dict) else {}
 
 
+def guard_set_server_state(conn: Any, backend: str, server: str, state: str) -> str:
+    """Raise what ``set_server_state`` would raise, without writing.
+
+    Resolving the runtime-server path is what raises the registry's
+    :class:`~proxy_aiops.platform.UnsupportedOperation` on traefik/caddy, so a
+    preview off-platform refuses exactly as the write does instead of showing a
+    green banner for a call that cannot run. Returns the normalised state, so
+    the preview reports the value the real call would use rather than the raw
+    argument. No I/O — the path lookup is a table read.
+    """
+    state = str(state).strip().lower()
+    if state not in SERVER_STATES:
+        raise ValueError(
+            f"state must be one of {SERVER_STATES}, got '{state}'."
+        )
+    conn.platform.path("runtime_server", name=server, backend=backend)
+    return state
+
+
+def guard_set_server_weight(conn: Any, backend: str, server: str, weight: int) -> int:
+    """Raise what ``set_server_weight`` would raise, without writing.
+
+    Same off-platform teaching error and same zero I/O cost as
+    :func:`guard_set_server_state`; returns the coerced weight.
+    """
+    try:
+        weight = int(weight)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"weight must be an integer, got '{weight}'.") from exc
+    if not (_MIN_WEIGHT <= weight <= _MAX_WEIGHT):
+        raise ValueError(
+            f"weight must be between {_MIN_WEIGHT} and {_MAX_WEIGHT}, got {weight}."
+        )
+    conn.platform.path("runtime_server", name=server, backend=backend)
+    return weight
+
+
 def set_server_state(conn: Any, backend: str, server: str, state: str) -> dict:
     """[WRITE][med] Set a server's admin state (ready / drain / maint),
     capturing its prior admin state. Undo restores it.
@@ -287,12 +324,8 @@ def set_server_state(conn: Any, backend: str, server: str, state: str) -> dict:
     ``drain`` finishes in-flight sessions but takes no new ones; ``maint``
     removes the server immediately; ``ready`` returns it to rotation.
     """
-    state = str(state).strip().lower()
-    if state not in SERVER_STATES:
-        raise ValueError(
-            f"state must be one of {SERVER_STATES}, got '{state}'."
-        )
-    # Resolving the path first raises the teaching error on traefik/caddy.
+    # Validates and raises the teaching error on traefik/caddy before any I/O.
+    state = guard_set_server_state(conn, backend, server, state)
     path = conn.platform.path("runtime_server", name=server, backend=backend)
     prior = _runtime_server(conn, backend, server)
     prior_state = str(prior.get("admin_state") or "").lower() or None
@@ -310,14 +343,8 @@ def set_server_weight(conn: Any, backend: str, server: str, weight: int) -> dict
     """[WRITE][med] Set a server's load-balancing weight, capturing the prior
     weight. Undo restores it. Weight 0 stops new traffic without a state change.
     """
-    try:
-        weight = int(weight)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"weight must be an integer, got '{weight}'.") from exc
-    if not (_MIN_WEIGHT <= weight <= _MAX_WEIGHT):
-        raise ValueError(
-            f"weight must be between {_MIN_WEIGHT} and {_MAX_WEIGHT}, got {weight}."
-        )
+    # Validates and raises the teaching error on traefik/caddy before any I/O.
+    weight = guard_set_server_weight(conn, backend, server, weight)
     path = conn.platform.path("runtime_server", name=server, backend=backend)
     prior = _runtime_server(conn, backend, server)
     prior_weight = prior.get("weight")

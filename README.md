@@ -17,8 +17,8 @@ writes point you at its providers (file, container labels, orchestrator CRDs), n
 a silent no-op.
 
 Every tool runs through a **built-in governance harness** (vendored, zero external
-dependency): audit log, token/call budget with runaway circuit-breaker, graduated
-risk-tier approval, undo-token recording, and output sanitisation.
+dependency): audit log, token/call budget with runaway circuit-breaker,
+descriptive risk-tier labelling, undo-token recording, and output sanitisation.
 
 ## Why this exists
 
@@ -39,42 +39,26 @@ risk-tier approval, undo-token recording, and output sanitisation.
   subtree/config is fetched first, so the recorded undo replays a real restore)
   and haproxy runtime server `state` (ready/drain/maint) and `weight` (undo
   restores the prior value) — all with `dry_run` previews; delete/load are
-  **risk=high** behind an approver gate.
+  **risk=high** with double confirmation at the CLI.
 
-## Security: read-only mode
+## What this tool does, and does not, decide
 
-This tool is meant to be handed to an AI agent, so its safety story is enforced
-by the server rather than requested in a prompt:
+It delivers proxy operations — reads and writes — accurately and efficiently,
+and records every one of them. It does **not** decide whether a write is allowed
+to happen. That is the agent's judgement, or the permission of the account you
+connect it with: give the HAProxy Data Plane API a read-only role, or scope down
+the Traefik/Caddy admin API you point it at, and the writes fail at the server —
+the place that actually owns the permission.
 
-```bash
-export PROXY_READ_ONLY=1
-```
+So there is no read-only switch, no policy file, no approval gate to configure.
+The one thing the tool guarantees is that nothing is silent: **every call, over
+MCP and over the CLI alike, lands an audit row** in `~/.proxy-aiops/audit.db`,
+and reversible writes still capture their before-state and record an inverse.
 
-With that set, the **6 write tools are never registered**. An MCP client
-lists **22 tools instead of 28** — the writes are not hidden, not
-gated behind a flag, and not merely refused when called. They are absent from
-the session. A model cannot invoke a tool it was never offered, and cannot be
-argued into one.
-
-That distinction is the whole point. A tool that exists but refuses still invites
-retry loops and "I'll describe the call instead" behaviour from smaller models,
-and it leaves a reviewer trusting a promise. An absent tool is a fact you can
-check: connect, list the tools, and see that the writes are not there.
-
-Enforcement is two layers deep, so the switch cannot be sidestepped by changing
-entry point:
-
-| Layer | What it does | Covers |
-|---|---|---|
-| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
-| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
-
-Read operations are unaffected, and every call is still audited to
-`~/.proxy-aiops/audit.db`.
-
-> The read/write split is derived from each tool's declared `risk_level`, and a
-> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
-> tool's own documentation — so a write can't quietly present itself as a read.
+> Each tool declares a `risk_level`, kept in agreement with its `[READ]`/`[WRITE]`
+> documentation tag by a test, and carried into the audit row as a descriptive
+> tier — so a reviewer can see at a glance that a row was a high-risk delete. It
+> is a label, not a gate.
 
 Running a smaller / local model? See
 [agent-guardrails.md](skills/proxy-aiops/references/agent-guardrails.md) — it lists
@@ -198,21 +182,24 @@ an interactive prompt (CLI on a TTY). A legacy plaintext env var
 
 ## Governance
 
-Every MCP tool is wrapped by `@governed_tool`:
+Every MCP tool — and every CLI write, which routes through the same governed
+functions — passes through `@governed_tool`. It records; it does not authorize
+(see above).
 
 - **Audit** — every call is logged to `~/.proxy-aiops/audit.db` (tool, params with
-  secrets redacted, status, duration, risk tier, approver, rationale).
-- **Budget / runaway guard** — per-process token/call caps and a repeat-call circuit
-  breaker (`PROXY_MAX_TOOL_CALLS`, `PROXY_RUNAWAY_MAX`, …).
-- **Graduated risk tiers — secure by default** — with no
-  `~/.proxy-aiops/rules.yaml`, high-risk writes (`delete_config_path`,
-  `load_config`) require an approver: set `PROXY_AUDIT_APPROVED_BY` (and
-  `PROXY_AUDIT_RATIONALE`) before they will run. `init` seeds a starter
-  rules.yaml; an operator-authored rules file is honoured as-is.
+  secrets redacted, status, duration, risk tier, and any operator-supplied
+  approver/rationale). The CLI writes the same row the MCP path does — there is no
+  unaudited entry point.
+- **Budget / runaway guard** — a safety backstop, not an authorization gate:
+  per-process token/call caps and a repeat-call circuit breaker stop a stuck agent
+  from burning unbounded calls/time (`PROXY_MAX_TOOL_CALLS`, `PROXY_RUNAWAY_MAX`,
+  …; disable the breaker with `PROXY_RUNAWAY_MAX=0`).
 - **Undo recording** — reversible writes record an inverse descriptor to
   `~/.proxy-aiops/undo.db` from the fetched before-state (recording only; an
   external orchestrator executes it). Undo params match the target tool's own
   signature, so the descriptor replays as-is.
+- **Risk tier** — a descriptive label on the audit row derived from `risk_level`;
+  it gates nothing.
 - **Sanitisation** — all proxy-returned text is bounded + control-character
   sanitised before it reaches the agent.
 

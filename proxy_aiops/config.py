@@ -30,7 +30,12 @@ import yaml
 
 from proxy_aiops.governance.paths import ops_home
 from proxy_aiops.platform import PLATFORMS, TRAEFIK, get_platform
-from proxy_aiops.secretstore import SecretStoreError, get_secret, has_store
+from proxy_aiops.secretstore import (
+    MasterPasswordError,
+    SecretStoreError,
+    get_secret,
+    has_store,
+)
 
 if TYPE_CHECKING:
     from proxy_aiops.platform import Platform
@@ -55,8 +60,15 @@ def _lookup_secret(name: str) -> str | None:
     if has_store():
         try:
             return get_secret(name)
+        except MasterPasswordError:
+            # A wrong or missing master password is NOT "this target has no
+            # secret". Falling through resurfaced it as "No API key for target
+            # X", sending the operator to add a credential that is already
+            # there. MasterPasswordError subclasses SecretStoreError, so the
+            # broad catch below would swallow it — re-raise first.
+            raise
         except SecretStoreError:
-            pass  # fall through to legacy env var
+            pass  # no secret stored for this target — try the legacy env var
     legacy = os.environ.get(_secret_env_key(name))
     if legacy:
         _log.warning(

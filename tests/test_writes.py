@@ -239,12 +239,19 @@ def test_dry_run_previews_do_not_mutate(monkeypatch):
 
     assert t.set_config_value(path="a/b", value=1, dry_run=True)["dryRun"] is True
     assert t.delete_config_path(path="a/b", dry_run=True)["dryRun"] is True
+    # Previews whose guard is static (or absent) touch nothing at all.
+    conn.get.assert_not_called()
+
+    # The haproxy-only runtime writes preview on haproxy...
+    ha = _conn(HAPROXY)
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: ha)
     assert t.set_server_state(backend="b", server="s", state="drain",
                               dry_run=True)["dryRun"] is True
     assert t.set_server_weight(backend="b", server="s", weight=1,
                                dry_run=True)["dryRun"] is True
-    # Previews whose guard is static (or absent) touch nothing at all.
-    conn.get.assert_not_called()
+    ha.get.assert_not_called()
+
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
 
     # load_config IS guarded by a comparison against the live config, so its
     # preview pays the same config_root GET the real call makes. A preview that
@@ -257,6 +264,60 @@ def test_dry_run_previews_do_not_mutate(monkeypatch):
     conn.post.assert_not_called()
     conn.put.assert_not_called()
     conn.delete.assert_not_called()
+
+
+@pytest.mark.parametrize("platform", [CADDY, TRAEFIK])
+@pytest.mark.unit
+def test_server_write_preview_refuses_off_platform(monkeypatch, platform):
+    """A preview on a platform without runtime servers must carry the support
+    matrix's refusal, not a green 'wouldSetState'.
+
+    This is the weak-model trap the reroute exists to close: a green preview
+    followed by a refusal on the real call reads as a transient failure and
+    invites a retry loop.
+    """
+    from mcp_server.tools import writes as t
+
+    conn = _conn(platform)
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
+
+    for out in (
+        t.set_server_state(backend="b", server="s", state="drain", dry_run=True),
+        t.set_server_weight(backend="b", server="s", weight=1, dry_run=True),
+    ):
+        assert "dryRun" not in out
+        assert "runtime_server" in out["error"]
+    conn.put.assert_not_called()
+
+
+@pytest.mark.unit
+def test_server_write_preview_refuses_invalid_input(monkeypatch):
+    """The value checks run on the preview path too — same reason."""
+    from mcp_server.tools import writes as t
+
+    conn = _conn(HAPROXY)
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
+
+    bad_state = t.set_server_state(backend="b", server="s", state="nope", dry_run=True)
+    assert "dryRun" not in bad_state
+    assert "state must be one of" in bad_state["error"]
+
+    bad_weight = t.set_server_weight(backend="b", server="s", weight=999, dry_run=True)
+    assert "dryRun" not in bad_weight
+    assert "between" in bad_weight["error"]
+    conn.put.assert_not_called()
+
+
+@pytest.mark.unit
+def test_server_write_preview_reports_normalised_state(monkeypatch):
+    """The preview shows the value the real call would use, not the raw arg."""
+    from mcp_server.tools import writes as t
+
+    conn = _conn(HAPROXY)
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
+
+    out = t.set_server_state(backend="b", server="s", state="  DRAIN ", dry_run=True)
+    assert out["wouldSetState"]["state"] == "drain"
 
 
 # ── undo descriptors invert correctly and REPLAY against real signatures ────

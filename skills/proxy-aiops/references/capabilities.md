@@ -75,9 +75,10 @@ All four analyses accept injected rows for pure offline analysis.
 | `undo_list(limit?)` | recorded undo descriptors, newest first, with their `_undo_id` |
 | `undo_apply(undo_id, dry_run?)` | replays the recorded inverse (governed like any other write) |
 
-High-risk writes require `PROXY_AUDIT_APPROVED_BY` under the secure-by-default
-policy. Undo descriptors are recorded to `~/.proxy-aiops/undo.db`; their params
-match each tool's own signature (replayable as-is).
+`undo_apply` is governed like any other write (audited, capturing a before-state
+where the inverse is itself reversible). Undo descriptors are recorded to
+`~/.proxy-aiops/undo.db`; their params match each tool's own signature
+(replayable as-is).
 
 ## Modelled API paths (mock-validated)
 

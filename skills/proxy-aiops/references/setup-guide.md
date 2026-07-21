@@ -30,10 +30,6 @@ answer No only for self-signed lab certs) → credentials:
   empty for the common unauthenticated-localhost case (no store entry means no
   auth header is sent).
 
-The wizard also seeds `~/.proxy-aiops/rules.yaml` with the secure-by-default
-policy (high-risk writes require a named approver) — edit it to fit your
-change-management process; a re-run never overwrites your edits.
-
 ## 3. Verify
 
 ```bash

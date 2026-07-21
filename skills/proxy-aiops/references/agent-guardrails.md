@@ -9,16 +9,32 @@ the tool now enforces them itself.
 The distinction matters. A guardrail in a prompt is a request. A guardrail in the
 harness is a guarantee. Anything below that we could move into the harness, we did.
 
-## What the tool now enforces — do not waste prompt budget on these
+## Authorization is not this tool's job — decide it where it belongs
+
+Whether a write should happen is your decision, or the account's. The tool does
+not gate it — there is no read-only switch and no approval prompt to configure.
+The two right places to control read vs write:
+
+- **The account you connect with.** Give the HAProxy Data Plane API a read-only
+  role, or point the tool at a Traefik/Caddy admin API you have scoped down. A
+  write then fails at the server, which is the only place the permission actually
+  lives — a revoked permission cannot be argued around by a model, but a skill-side
+  flag can.
+- **Your agent's system prompt.** If you want an observe-only session, tell the
+  model not to call the write tools (they are clearly tagged `[WRITE]`).
+
+What the tool *does* guarantee is that you can always see what happened:
+
+## What the tool enforces — do not waste prompt budget on these
 
 | You might be tempted to prompt | Why you don't need to |
 |---|---|
-| "Work read-only, never change the proxy config" | Set `PROXY_READ_ONLY=1`. The six write tools (`set_config_value`, `delete_config_path`, `load_config`, `set_server_state`, `set_server_weight`, `undo_apply`) are then **not registered at all** — they never appear in the tool list, so the model cannot call one even if it tries. The `@governed_tool` harness independently refuses writes, so the CLI is covered too. |
 | "Don't invent a value when a field is missing" | Traefik, Caddy and HAProxy express the same concepts differently, so a field one platform has and another does not comes back as `null`, never as `""`. A Caddy route's `raw` rule string is `null` — Caddy matches on a match list and has no such string — rather than a misleading empty rule. |
 | "Tell me if the output was cut off" | `search_config`, `traffic_stats` and `error_counters` return `{"matches"/"services": [...], "returned": N, "limit": L, "truncated": true/false}` — one convention across the repo. Truncation is measured (the config walk deliberately overshoots by one) and not guessed from the count reaching the cap. |
 | "Preserve the ordering / tell me what's most urgent" | `backend_health_rca`, `error_rate_rca`, `route_conflict_analysis` and `cert_expiry_sweep` rank findings worst-first with the measured number attached. Priority is in the payload, not implied by list position. |
-| "Confirm before anything destructive" | `delete_config_path` and `load_config` require a `--dry-run`-able preview plus double confirmation at the CLI, and a named approver (`PROXY_AUDIT_APPROVED_BY`) for high-risk tiers. Config writes capture the prior value so the undo token can restore it. |
-| "Log what you did" | Every governed call is audited to `~/.proxy-aiops/audit.db` regardless of what the model says it did. |
+| "Confirm before anything destructive" | `delete_config_path` and `load_config` require a `--dry-run`-able preview plus double confirmation at the CLI. Config writes capture the prior value so the undo token can restore it. |
+| "Log what you did" | Every governed call is audited to `~/.proxy-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. |
+| "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
 
 ## What still needs a prompt
 
@@ -66,24 +82,24 @@ SCOPE
 
 ## Recommended setup for a local model
 
+Start with a connection that *cannot* write, verify, and widen the account's
+permission only when you trust the setup — a proxy is the one component where a
+bad config change takes down everything behind it at once, and `load_config`
+replaces the whole tree:
+
 ```bash
-# Read-only until you trust the setup — this is enforced, not advisory.
-export PROXY_READ_ONLY=1
+# e.g. give the HAProxy Data Plane API a read-only role, or point the tool at a
+# Traefik/Caddy admin API you have scoped down. Then:
 proxy-aiops doctor
 ```
 
-Then, when you are ready to allow writes, unset it and set an approver so the
-high-risk tier has an accountable name on it:
+Optionally annotate the audit trail with who is operating and why — recorded on
+every row, never required:
 
 ```bash
-unset PROXY_READ_ONLY
 export PROXY_AUDIT_APPROVED_BY="your.name@example.com"
 export PROXY_AUDIT_RATIONALE="draining web-02 for maintenance"
 ```
-
-Read-only is a reasonable default at the edge: a proxy is the one component
-where a bad config change takes down everything behind it at once, and
-`load_config` replaces the whole tree.
 
 ## If your model still struggles
 

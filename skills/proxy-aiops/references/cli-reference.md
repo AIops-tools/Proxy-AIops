@@ -40,15 +40,16 @@ proxy-aiops analyze conflicts                   # shadowed/dead routes, redirect
 ```bash
 # caddy config (teaching error on traefik/haproxy targets)
 proxy-aiops config set <path> '<json>' [--dry-run]
-proxy-aiops config delete <path> [--dry-run]        # risk=high, needs approver
+proxy-aiops config delete <path> [--dry-run]        # risk=high, double-confirm
 
 # haproxy runtime servers (teaching error on traefik/caddy targets)
 proxy-aiops server state <backend> <server> ready|drain|maint [--dry-run]
 proxy-aiops server weight <backend> <server> <0-256> [--dry-run]
 ```
 
-High-risk writes need `PROXY_AUDIT_APPROVED_BY` (and ideally
-`PROXY_AUDIT_RATIONALE`) exported first.
+High-risk writes prompt for double confirmation at the CLI. Optionally export
+`PROXY_AUDIT_APPROVED_BY` (and `PROXY_AUDIT_RATIONALE`) to annotate the audit
+row with who/why — never required.
 
 ## Secrets
 
@@ -72,8 +73,8 @@ proxy-aiops mcp        # stdio transport (or: proxy-aiops-mcp)
 |----------|---------|
 | `PROXY_AIOPS_MASTER_PASSWORD` | unlock secrets.enc non-interactively (MCP/CI) |
 | `PROXY_AIOPS_CONFIG` | alternate config.yaml path (MCP server) |
-| `PROXY_AIOPS_HOME` | relocate config/audit/undo/rules state dir |
-| `PROXY_AUDIT_APPROVED_BY` / `PROXY_AUDIT_RATIONALE` | approver metadata for high-risk writes |
+| `PROXY_AIOPS_HOME` | relocate config/audit/undo state dir |
+| `PROXY_AUDIT_APPROVED_BY` / `PROXY_AUDIT_RATIONALE` | optional approver/rationale annotations recorded on the audit row |
 | `PROXY_MAX_TOOL_CALLS` / `PROXY_MAX_TOOL_SECONDS` | per-process budget ceilings |
 | `PROXY_RUNAWAY_MAX` / `PROXY_RUNAWAY_WINDOW_SEC` | runaway circuit-breaker tuning |
 | `PROXY_<TARGET>_SECRET` | legacy plaintext fallback (deprecated) |

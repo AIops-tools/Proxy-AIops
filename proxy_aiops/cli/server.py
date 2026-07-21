@@ -18,7 +18,7 @@ from proxy_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
 )
 
 server_app = typer.Typer(
@@ -41,9 +41,15 @@ def server_state(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="set_server_state",
-                      api_call=f"PUT runtime server {backend}/{server}",
-                      parameters={"backend": backend, "server": server, "state": state})
+        # Through the governed call: set_server_state is haproxy-only and
+        # validates the state, so a preview must report either refusal.
+        dry_run_preview(
+            gov.set_server_state(
+                backend=backend, server=server, state=state, dry_run=True, target=target
+            ),
+            operation="set_server_state",
+            api_call=f"PUT runtime server {backend}/{server}",
+            parameters={"backend": backend, "server": server, "state": state})
         return
     double_confirm(f"set state={state} on", f"{backend}/{server}")
     console.print_json(json.dumps(
@@ -64,9 +70,15 @@ def server_weight(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="set_server_weight",
-                      api_call=f"PUT runtime server {backend}/{server}",
-                      parameters={"backend": backend, "server": server, "weight": weight})
+        # Through the governed call: set_server_weight is haproxy-only and
+        # range-checks the weight, so a preview must report either refusal.
+        dry_run_preview(
+            gov.set_server_weight(
+                backend=backend, server=server, weight=weight, dry_run=True, target=target
+            ),
+            operation="set_server_weight",
+            api_call=f"PUT runtime server {backend}/{server}",
+            parameters={"backend": backend, "server": server, "weight": weight})
         return
     double_confirm(f"set weight={weight} on", f"{backend}/{server}")
     console.print_json(json.dumps(

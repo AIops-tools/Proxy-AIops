@@ -41,9 +41,10 @@ Every MCP tool runs through the bundled `@governed_tool` harness
 - **Token/runaway budget** — hard ceilings (`PROXY_MAX_TOOL_CALLS` /
   `PROXY_MAX_TOOL_SECONDS`) plus an on-by-default guard that trips a tight
   poll/retry loop, preventing unbounded API consumption.
-- **Graduated risk tiers** — `~/.proxy-aiops/rules.yaml` `risk_tiers` gate
-  writes; **secure by default**: with no rules.yaml, high-risk operations
-  require a recorded approver (`PROXY_AUDIT_APPROVED_BY`).
+- **Risk tier** — a descriptive label on each audit row derived from
+  `risk_level`; it gates nothing. `PROXY_AUDIT_APPROVED_BY` /
+  `PROXY_AUDIT_RATIONALE` are optional annotations recorded on the row, never
+  required and never blocking.
 - **Undo-token recording** — reversible writes capture the BEFORE state (via a
   real GET) and record an inverse descriptor (config subtree restore, prior
   admin state / weight) whose params match the target tool's signature, so it
@@ -52,9 +53,8 @@ Every MCP tool runs through the bundled `@governed_tool` harness
 ### State-Changing Operations
 The caddy config writes and haproxy runtime-server writes are the only
 state-changing tools. `delete_config_path` and `load_config` (full config
-replace) are `risk_level=high`, accept a `dry_run` preview, and (under
-`risk_tiers`) require a recorded approver (`PROXY_AUDIT_APPROVED_BY` +
-`PROXY_AUDIT_RATIONALE`). `set_config_value`, `set_server_state` and
+replace) are `risk_level=high`, accept a `dry_run` preview, and require double
+confirmation at the CLI. `set_config_value`, `set_server_state` and
 `set_server_weight` are `risk_level=medium`; all capture before-state and
 record an undo token. Traefik targets accept **no writes at all** — the support
 matrix raises a teaching error pointing at its providers.

@@ -22,7 +22,7 @@ compatibility: >
   Standalone, self-governed reverse-proxy operations across Traefik (API /api/..., metrics-text counters via /metrics), Caddy (admin API, default localhost:2019 — carries the write surface) and HAProxy (Data Plane API v2 /v2/..., HTTP Basic auth). Each target in the config names its own platform, and a name-keyed platform registry selects the API shape; an explicit support matrix raises teaching errors for ops a platform cannot do (traefik writes → its providers; caddy error counters → access logs; haproxy certs → the .pem pipeline), never a silent no-op. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency.
   All write operations are audited to a local SQLite DB under ~/.proxy-aiops/ (relocatable via PROXY_AIOPS_HOME).
   Credentials: the HAProxy Data Plane API password (required) or an optional Basic-auth credential for Traefik/Caddy is stored ENCRYPTED in ~/.proxy-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Traefik and Caddy usually run unauthenticated on localhost, so their secret is optional (no store entry = no auth header). Run 'proxy-aiops init' to onboard (it asks for the platform), or 'proxy-aiops secret set <target>'. The store is unlocked by a master password from PROXY_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var PROXY_<TARGET_NAME_UPPER>_SECRET is still honoured as a fallback with a deprecation warning (migrate with 'proxy-aiops secret migrate'). Secrets are never logged or echoed.
-  State-changing operations pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier gate). delete_config_path and load_config (full config replace) are risk=high with dry_run + an approver gate. Reversible writes (set_config_value, delete_config_path, load_config, set_server_state, set_server_weight) capture the real fetched before-state and record an inverse undo descriptor whose params replay against the tool's own signature.
+  State-changing operations pass through the @governed_tool decorator (budget guard + audit + risk-tier labelling). delete_config_path and load_config (full config replace) are risk=high with dry_run + double confirmation at the CLI. Reversible writes (set_config_value, delete_config_path, load_config, set_server_state, set_server_weight) capture the real fetched before-state and record an inverse undo descriptor whose params replay against the tool's own signature.
   Webhooks: none — no outbound network calls beyond the configured proxy APIs, plus (only when the operator runs the cert sweep with probing) a bounded TLS handshake per inventoried domain.
   SSL: verify_ssl defaults to true; disable only for self-signed lab certs.
   Transitive dependencies: httpx (HTTP client), cryptography (secret store + cert parsing), and the MCP SDK. No post-install scripts or background services.
@@ -36,7 +36,7 @@ Governed reverse-proxy operations — **28 MCP tools** across **Traefik** (API +
 `/metrics`), **Caddy** (admin API) and **HAProxy** (Data Plane API v2), every
 one wrapped with the bundled `@governed_tool` harness: a local unified audit
 log under `~/.proxy-aiops/`, policy engine, token/runaway budget guard,
-undo-token recording, and graduated-autonomy risk tiers. A per-target
+undo-token recording, and descriptive risk tiers. A per-target
 `platform` field selects the API shape, so the same tools work on all three
 proxies and one config can span a mixed edge. An explicit **support matrix**
 raises teaching errors for ops a platform cannot do — never a silent no-op.
@@ -195,24 +195,23 @@ firewall-aiops.
 7. **Failure branch**: `proxy-aiops undo list` → `undo apply <id>` restores the captured
    subtree exactly. If the config is too broken for a targeted undo, the
    `config snapshot` from step 1 is your fallback via `load_config` — but note
-   `load_config` and `config delete` are **risk=high** and require
-   `PROXY_AUDIT_APPROVED_BY` (plus `PROXY_AUDIT_RATIONALE`) with no `rules.yaml` present.
-   `load_config` replaces the *entire* config, so it is a last resort, not a first
-   instinct.
+   `load_config` and `config delete` are **risk=high** with `--dry-run` + double
+   confirmation at the CLI. `load_config` replaces the *entire* config, so it is a
+   last resort, not a first instinct.
 
 ## Governance & Safety
 
-- Every tool is audited to `~/.proxy-aiops/audit.db` (relocatable via
-  `PROXY_AIOPS_HOME`).
-- **Secure by default**: with no `~/.proxy-aiops/rules.yaml`, high-risk ops
-  (`delete_config_path`, `load_config`) are denied unless
-  `PROXY_AUDIT_APPROVED_BY` names an approver (set `PROXY_AUDIT_RATIONALE`
-  too). `proxy-aiops init` seeds a starter rules.yaml; an operator-authored
-  rules file is honoured as-is.
-- Writes support `--dry-run` and double confirmation at the CLI; CLI writes
-  execute through the same governed tools, so they are audited + undo-recorded.
-- Reversible writes capture the real fetched before-state and record an
-  inverse descriptor that replays against the tool's own signature.
+The skill delivers reads and writes and records them; it does **not** decide
+whether a write is permitted. That is your agent's judgement, or the permission
+of the account you connect it with (a read-only HAProxy Data Plane API role, a
+scoped Traefik/Caddy admin API — writes then fail at the server). There is no
+read-only switch, policy file, or approval gate.
+
+- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.proxy-aiops/audit.db` (relocatable via `PROXY_AIOPS_HOME`): params (secrets redacted), result, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
+- `PROXY_AUDIT_APPROVED_BY` / `PROXY_AUDIT_RATIONALE` are optional annotations recorded on the audit row (who/why); they are never required and never block.
+- **Runaway guard** — a safety backstop, not authorization: the same call looped in a tight window trips a circuit breaker. Disable with `PROXY_RUNAWAY_MAX=0`.
+- Writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI; CLI writes execute through the same governed tools, so they are audited + undo-recorded.
+- Reversible writes capture the real fetched before-state and record an inverse descriptor that replays against the tool's own signature.
 - Traefik targets accept no writes at all — the support matrix teaches you to
   edit the provider source instead.
 

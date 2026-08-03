@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Fixed
+- **Undoing a deleted array element could never work.** `delete_config_path` is a high-risk write that records an undo, but its inverse re-created the subtree with POST — and once `routes/1` is deleted the array is shorter, so Caddy answers *"array index out of bounds"*. Array paths (`routes/N`, `handle/N`, `upstreams/N`) are the norm in a Caddy config, so the token for a destructive write was routinely un-replayable. The inverse now inserts with PUT, which is Caddy's insert-at-index. Verified live against Caddy 2, including deleting the **last** element and restoring it into an empty array.
+- **`set_config_value(insert=True)` no longer pre-reads the index.** There is nothing at that index by definition, and Caddy answers a GET of an out-of-range index with **400, not 404**, so the pre-read re-raised and the insert never reached the wire — which is what made the undo above look like a rejected write rather than a missing capability.
 - **`undo apply` replays against the target the original write ran on.** It dispatched the inverse against whatever target the *caller* named — in practice the config's first entry — while the write's own target sat unused in the undo record. On a multi-target config the inverse therefore ran against the wrong host; it only looks harmless because the resource usually is not there, but two hosts holding the same name and the inverse **succeeds on the wrong one, silently**. An explicitly named target still wins. Line-wide: all 24 copies had the identical defect. Caught live in container-host-aiops, where a stop recorded against a Podman target replayed against a Portainer one.
 
 ## v0.6.0 — 2026-08-02

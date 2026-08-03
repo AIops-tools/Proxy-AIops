@@ -51,11 +51,23 @@ def _delete_config_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
     prior = result.get("priorState") or {}
     if not prior.get("existed"):
         return None
+    array = bool(prior.get("arrayIndex"))
     return {
         "tool": "set_config_value",
-        "params": {"path": params.get("path"), "value": prior.get("value")},
+        "params": {
+            "path": params.get("path"),
+            "value": prior.get("value"),
+            # Deleting an array element shortens the array, so putting it back
+            # is an INSERT at that index, not a create. POST is rejected with
+            # "array index out of bounds".
+            "insert": array,
+        },
         "skill": "proxy-aiops",
-        "note": "Inverse of delete_config_path: re-create the deleted subtree.",
+        "note": (
+            "Inverse of delete_config_path: re-insert the deleted array element."
+            if array
+            else "Inverse of delete_config_path: re-create the deleted subtree."
+        ),
     }
 
 
@@ -121,6 +133,7 @@ def _server_weight_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
 def set_config_value(
     path: str,
     value: Any,
+    insert: bool = False,
     dry_run: bool = False,
     target: Optional[str] = None,
 ) -> dict:
@@ -141,6 +154,9 @@ def set_config_value(
         path: Slash-separated config path (from search_config / list_routes,
             e.g. apps/http/servers/srv0/routes/0/handle/0/upstreams).
         value: The JSON value to write at that path.
+        insert: Insert into an array at that index instead of replacing. This
+            is what re-creating a deleted array element requires — Caddy
+            rejects a create at an index past the (now shorter) array.
         dry_run: If True, preview without changing.
         target: Proxy target name from config; omit for the default.
     """
@@ -149,8 +165,9 @@ def set_config_value(
     # must say so, or the caller reads the refusal as transient and retries.
     ops.guard_set_config_value(conn, path, value)
     if dry_run:
-        return {"dryRun": True, "wouldSet": {"path": path, "value": value}}
-    return ops.set_config_value(conn, path, value)
+        return {"dryRun": True,
+                "wouldSet": {"path": path, "value": value, "insert": insert}}
+    return ops.set_config_value(conn, path, value, insert=insert)
 
 
 @mcp.tool()

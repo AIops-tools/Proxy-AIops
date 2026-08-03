@@ -191,12 +191,28 @@ def _get_config_subtree(conn: Any, enc_path: str) -> tuple[Any, bool]:
         raise
 
 
-def set_config_value(conn: Any, path: str, value: Any) -> dict:
+def _is_array_index(path: str) -> bool:
+    """Does this path address an element of an array (…/routes/1)?"""
+    segments = _config_segments(path)
+    return bool(segments) and segments[-1].isdigit()
+
+
+def set_config_value(
+    conn: Any, path: str, value: Any, insert: bool = False
+) -> dict:
     """[WRITE][med] Set one config subtree (e.g. a route's upstreams),
     capturing the prior subtree for a replayable undo.
 
     PATCH replaces an existing subtree; a path that does not exist yet is
     created with POST. The prior value is fetched via a real GET first.
+
+    ``insert=True`` uses Caddy's PUT, which **inserts into an array at the given
+    index** rather than replacing. That is the only correct inverse of deleting
+    an array element: once ``routes/1`` is deleted the array is shorter, so
+    re-creating it with POST is rejected outright — Caddy answers *"array index
+    out of bounds: 1"*. Array paths are the norm in a Caddy config
+    (``routes/N``, ``handle/N``, ``upstreams/N``), so without this every
+    ``delete_config_path`` of an element recorded an undo that could not run.
 
     **Refuses to write the ``admin`` subtree** — that is the admin API this tool
     speaks to, and disabling or moving it would leave the recorded undo with
@@ -207,12 +223,22 @@ def set_config_value(conn: Any, path: str, value: Any) -> dict:
     _refuse_admin_path(path, "set")
     base = conn.platform.path("config_set")  # teaching error off-platform
     enc = encode_config_path(path)
-    prior, existed = _get_config_subtree(conn, enc)
+    if insert:
+        # Nothing lives at that index yet — that is what "insert" means. Reading
+        # first is not merely pointless here, it FAILS: Caddy answers a GET of an
+        # out-of-range array index with 400 (not 404), which the pre-read
+        # re-raises, so the insert never reached the wire. That 400 is what made
+        # the undo of a deleted array element look like a rejected write.
+        prior, existed = None, False
+    else:
+        prior, existed = _get_config_subtree(conn, enc)
     if not _config_segments(path):
         # A root path replaces the whole tree, so the admin block rides along.
         # (Reuses the prior already in hand rather than re-fetching it.)
         _refuse_admin_teardown(prior, value, "replace the config root")
-    if existed:
+    if insert:
+        conn.put(base + enc, json=value)
+    elif existed:
         conn.patch(base + enc, json=value)
     else:
         conn.post(base + enc, json=value)
@@ -220,6 +246,7 @@ def set_config_value(conn: Any, path: str, value: Any) -> dict:
         "action": "set_config_value",
         "path": s(path, 300),
         "priorState": {"value": prior, "existed": existed},
+        "inserted": insert,
         "note": "Caddy applies config changes immediately (no separate apply step).",
     }
 
@@ -244,7 +271,12 @@ def delete_config_path(conn: Any, path: str) -> dict:
     return {
         "action": "delete_config_path",
         "path": s(path, 300),
-        "priorState": {"value": prior, "existed": True},
+        # Whether the undo has to INSERT (array element) or re-create (map key).
+        "priorState": {
+            "value": prior,
+            "existed": True,
+            "arrayIndex": _is_array_index(path),
+        },
     }
 
 

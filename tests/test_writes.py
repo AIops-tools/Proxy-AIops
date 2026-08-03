@@ -76,7 +76,9 @@ def test_delete_config_path_captures_prior_and_requires_existence():
     prior = {"match": [{"host": ["old.example.com"]}]}
     conn = _conn(CADDY, {f"/config/{path}": prior})
     out = ops.delete_config_path(conn, path)
-    assert out["priorState"] == {"value": prior, "existed": True}
+    # arrayIndex travels with the capture: deleting routes/1 shortens the array,
+    # so the undo has to INSERT at that index rather than re-create it.
+    assert out["priorState"] == {"value": prior, "existed": True, "arrayIndex": True}
     conn.delete.assert_called_once()
 
     with pytest.raises(KeyError, match="does not exist"):
@@ -408,3 +410,65 @@ def test_undo_replay_executes_end_to_end(monkeypatch):
     assert result["state"] == "ready"
     _, kwargs = replay_conn.put.call_args
     assert kwargs["json"] == {"admin_state": "ready"}
+
+
+@pytest.mark.unit
+def test_deleting_an_array_element_records_an_insert_undo():
+    """The inverse of deleting routes/1 must PUT (insert), not POST (create).
+
+    Caught live against Caddy 2: after the delete the array is shorter, so
+    re-creating the element answers 400 *"array index out of bounds: 1"* — the
+    undo token for a high-risk destructive write could never run, and array
+    paths (routes/N, handle/N, upstreams/N) are the norm in a Caddy config.
+    """
+    from mcp_server.tools.writes import _delete_config_undo
+
+    desc = _delete_config_undo(
+        {"path": "apps/http/servers/lab/routes/1"},
+        {"priorState": {"value": {"x": 1}, "existed": True, "arrayIndex": True}},
+    )
+    assert desc["params"]["insert"] is True
+    assert "re-insert" in desc["note"]
+
+
+@pytest.mark.unit
+def test_deleting_a_map_key_still_records_a_plain_recreate():
+    from mcp_server.tools.writes import _delete_config_undo
+
+    desc = _delete_config_undo(
+        {"path": "apps/http/servers/lab"},
+        {"priorState": {"value": {"x": 1}, "existed": True, "arrayIndex": False}},
+    )
+    assert desc["params"]["insert"] is False
+
+
+@pytest.mark.unit
+def test_set_config_value_insert_uses_put():
+    from proxy_aiops.ops import writes as ops
+
+    conn = _conn(CADDY, {})
+    ops.set_config_value(conn, "apps/http/servers/lab/routes/1", {"x": 1}, insert=True)
+    conn.put.assert_called_once()
+    conn.post.assert_not_called()
+    conn.patch.assert_not_called()
+
+
+@pytest.mark.unit
+def test_insert_skips_the_pre_read_that_caddy_rejects():
+    """An insert must not GET the index first — Caddy answers that with 400.
+
+    Deleting the last element leaves an empty array. A GET of ``routes/0`` then
+    returns **400 "array index out of bounds"**, not 404, so the pre-read
+    re-raised and the insert never reached the wire: the undo of a deleted array
+    element failed with what looked like a rejected write. Caught live against
+    Caddy 2.
+    """
+    from proxy_aiops.ops import writes as ops
+
+    conn = _conn(CADDY, {})
+    conn.get.side_effect = AssertionError("insert must not pre-read the index")
+    out = ops.set_config_value(conn, "apps/http/servers/lab/routes/0",
+                               {"x": 1}, insert=True)
+    conn.put.assert_called_once()
+    assert out["priorState"] == {"value": None, "existed": False}
+    assert out["inserted"] is True

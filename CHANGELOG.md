@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 — 2026-08-03
 
 ### Fixed
 - **Undoing a deleted array element could never work.** `delete_config_path` is a high-risk write that records an undo, but its inverse re-created the subtree with POST — and once `routes/1` is deleted the array is shorter, so Caddy answers *"array index out of bounds"*. Array paths (`routes/N`, `handle/N`, `upstreams/N`) are the norm in a Caddy config, so the token for a destructive write was routinely un-replayable. The inverse now inserts with PUT, which is Caddy's insert-at-index. Verified live against Caddy 2, including deleting the **last** element and restoring it into an empty array.

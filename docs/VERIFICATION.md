@@ -54,19 +54,33 @@ that never round-trips through float64.
   one with 200 while changing nothing; 3.4.1 exposes `weight`/`uweight` and
   applies it. Both measured. The tool now refuses on the former rather than
   reporting a change that did not happen, and verifies the value stuck on the
-  latter. **Not verified:** a genuinely old Data Plane API serving `/v2` — the
-  HAProxy 2.8 image ships Data Plane API 3.4.1, so the v2 downgrade path (whose
-  path *reshaping* was written in this round) still has no live evidence behind
-  it, only unit tests.
+  latter.
+- **The v2 downgrade path: reshaping verified over the wire; a real v2 server is
+  unobtainable.** Every haproxytech image carries a Data Plane API 3.x that
+  serves **only** `/v3` — measured on `haproxy-alpine` **2.2 (DPA 3.2.0)**, 2.4
+  (3.3.5), 2.6 (3.4.1) and 3.0 (3.0.22); on the 2.2 build `/v1/info` and
+  `/v2/info` both 404 while `/v3/info` answers 200. There is no
+  `haproxytech/dataplaneapi` image at all. So a real v2 Data Plane API cannot be
+  stood up from containers, and the fallback is only reachable by an install that
+  pinned an old dataplaneapi *binary*.
+  What **is** now verified live: the generation probe (correctly choosing `/v3` on two
+  different builds), and — against a **v2-shaped stub** that 404s `/v3/info` and
+  serves the v2 routes — the downgrade actually reshapes the path. The stub saw
+  `GET /v3/info` (404) → `GET /v2/info` → `GET /v2/services/haproxy/runtime/servers/app2?backend=be_app`
+  → `PUT` the same, i.e. the backend really moves back into a query parameter.
+  The stub cannot attest to a real v2 server's *semantics*, only to the tool's
+  own behaviour, which previously had nothing but unit tests behind it.
 - ~~**TLS / certificate expiry** (`certs`) against real certificates~~ —
   **closed 2026-08-10.** `certs --sweep` against a Traefik serving a real
   certificate read the expiry from a live handshake and got it exactly right:
   14.0 days against a ground truth of 13.99, correct `notAfter`, bucketed
   `warning`; re-run against a certificate expiring in one day it bucketed
-  `critical`. The **expired** bucket (negative days) was not exercised against a
-  live handshake — OpenSSL 3.0 on the lab box cannot mint a back-dated
-  certificate with `req -x509` — so that one bucket rests on unit tests over the
-  same, now twice-verified, probe path. `certs` on HAProxy correctly reports
+  `critical`. The **expired** bucket is closed too: `openssl ca` *can* back-date
+  with explicit `-startdate`/`-enddate` (it is `req -x509` that cannot), so a
+  certificate that expired three days earlier was signed by a throwaway CA and
+  served through Traefik. The sweep read `daysToExpiry: -3.0` against a ground
+  truth of -3.0 and bucketed it `expired`. All three buckets are now verified
+  against a live handshake with exact day arithmetic. `certs` on HAProxy correctly reports
   itself unsupported (certificates are `.pem` files bound in haproxy.cfg).
 - **The tool's own transport over TLS is verified** (2026-08-10): with
   `verify_ssl: true` against a self-signed Data Plane API the connection fails

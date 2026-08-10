@@ -192,8 +192,42 @@ def test_set_server_weight_refuses_to_report_a_weight_that_did_not_stick():
     from proxy_aiops.ops import writes as ops
 
     conn = _conn(HAPROXY, {_runtime_path(): {"admin_state": "ready", "weight": 100}})
-    with pytest.raises(ProxyApiError, match="still reports 100"):
+    with pytest.raises(ProxyApiError, match="reports 100"):
         ops.set_server_weight(conn, "app", "web1", 25)
+
+
+@pytest.mark.unit
+def test_set_server_weight_read_back_failure_is_undetermined_not_failed():
+    """The PUT already landed, so a failed read-back cannot mean "it failed".
+
+    Raising here would audit a change that DID happen as an error and record no
+    undo token for it — the mirror image of reporting an unconfirmed write as a
+    success. Undetermined is the only honest verdict.
+    """
+    from unittest.mock import MagicMock
+
+    from proxy_aiops.connection import ProxyApiError
+    from proxy_aiops.ops import writes as ops
+    from proxy_aiops.platform import get_platform
+
+    reads = {"n": 0}
+
+    def flaky_get(_path, **_kw):
+        reads["n"] += 1
+        if reads["n"] == 1:
+            return {"admin_state": "ready", "weight": 100}
+        raise ProxyApiError("Resource not found (404)", status_code=404)
+
+    conn = MagicMock()
+    conn.target.platform = HAPROXY
+    conn.platform = get_platform(HAPROXY)
+    conn.get.side_effect = flaky_get
+
+    out = ops.set_server_weight(conn, "app", "web1", 25)
+    assert conn.put.called, "the write must have been attempted"
+    assert out["outcomeUnknown"] is True
+    assert out["priorState"] == {"weight": 100}
+    assert "404" in out["readBackError"]
 
 
 # ── wrong-platform writes raise the support matrix's teaching error ─────────

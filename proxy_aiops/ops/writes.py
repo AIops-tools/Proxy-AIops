@@ -34,6 +34,7 @@ import json
 from typing import Any
 
 from proxy_aiops.connection import ProxyApiError
+from proxy_aiops.governance import mark_unknown
 from proxy_aiops.ops._util import s
 from proxy_aiops.platform import UnsupportedOperation, encode_config_path
 
@@ -398,14 +399,32 @@ def set_server_weight(conn: Any, backend: str, server: str, weight: int) -> dict
         )
     prior_weight = prior.get("weight")
     conn.put(path, json={"weight": weight})
-    observed = _runtime_server(conn, backend, server).get("weight")
-    if observed is not None and int(observed) != weight:
-        # The API took the call but the server did not move. Never report that
-        # as done: an unconfirmed write is not a successful one.
+    try:
+        observed = _runtime_server(conn, backend, server).get("weight")
+    except ProxyApiError as exc:
+        # The PUT already landed. A read-back that fails therefore says nothing
+        # about whether it took effect, and raising here would audit a change
+        # that DID happen as a failure — and record no undo token for it. That
+        # is the same defect as reporting an unconfirmed write as a success,
+        # mirrored. Undetermined is the only honest answer.
+        return mark_unknown({
+            "action": "set_server_weight",
+            "backend": s(backend, 128),
+            "server": s(server, 128),
+            "weight": weight,
+            "priorState": {
+                "weight": int(prior_weight) if prior_weight is not None else None
+            },
+            "readBackError": s(exc, 200),
+        })
+    if observed is None or int(observed) != weight:
+        # The API took the call but the server did not move (or stopped
+        # reporting a weight at all). Never report that as done: an unconfirmed
+        # write is not a successful one.
         raise ProxyApiError(
             f"Set weight {weight} on {backend}/{server} was accepted but the "
-            f"server still reports {int(observed)}. The change did not take "
-            f"effect — check the Data Plane API version and the backend config."
+            f"server reports {observed!r}. The change did not take effect — "
+            f"check the Data Plane API version and the backend config."
         )
     return {
         "action": "set_server_weight",

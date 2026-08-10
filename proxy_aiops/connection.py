@@ -23,6 +23,7 @@ than leaking raw tracebacks. The httpx client is injectable for tests: pass
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
@@ -72,6 +73,21 @@ def _teaching_message(status: int, path: str, body: str, label: str) -> str:
     return f"{label} API error ({status}) on {path}. {snippet}"
 
 
+#: v3 puts the backend in the path; v2 put it in a query parameter. The registry
+#: carries the v3 shape, so only the downgrade needs a rule.
+_V3_RUNTIME_SERVERS_RE = re.compile(
+    r"^/v3/services/haproxy/runtime/backends/(?P<backend>[^/?]+)/servers(?:/(?P<name>[^/?]+))?$"
+)
+
+
+def _to_v2_runtime_servers(match: re.Match[str]) -> str:
+    """Reshape a v3 runtime-servers path into its v2 equivalent."""
+    backend = match.group("backend")
+    name = match.group("name")
+    leaf = f"/{name}" if name else ""
+    return f"/v3/services/haproxy/runtime/servers{leaf}?backend={backend}"
+
+
 class ProxyConnection:
     """A single authenticated session against one Traefik/Caddy/HAProxy target."""
 
@@ -107,13 +123,19 @@ class ProxyConnection:
         return self._target.platform_obj
 
     def _haproxy_path(self, path: str) -> str:
-        """Rewrite a ``/v3/`` Data Plane API path to ``/v2/`` on an older server.
+        """Rewrite a ``/v3/`` Data Plane API path for an older (v2) server.
 
         HAProxy 3.x ships Data Plane API v3, which serves **only** ``/v3`` — every
         ``/v2`` path 404s. Older installs are the mirror image. The registry holds
         the current (v3) paths and this probes ``/v3/info`` once per connection,
         falling back to ``/v2`` so both generations work. Probed lazily and cached:
         a v3 server costs one extra request per connection, a v2 server two.
+
+        A prefix swap is not always enough. v3 also **restructured** the runtime
+        servers resource — the backend moved out of a query parameter and into
+        the path — so a generation-aware rewrite has to reshape those two paths,
+        not just renumber them. Confirmed against the Data Plane API's own
+        ``/v3/specification``, which offers no ``/runtime/servers/{name}``.
         """
         if not path.startswith("/v3/"):
             return path
@@ -123,6 +145,8 @@ class ProxyConnection:
                 self._dpapi_prefix = "/v3/" if resp.status_code < 400 else "/v2/"
             except httpx.HTTPError:
                 self._dpapi_prefix = "/v3/"  # unreachable: let the real call report it
+        if self._dpapi_prefix == "/v2/":
+            path = _V3_RUNTIME_SERVERS_RE.sub(_to_v2_runtime_servers, path)
         return self._dpapi_prefix + path[4:]
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:

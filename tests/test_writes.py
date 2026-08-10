@@ -146,7 +146,12 @@ def test_set_server_state_validates_state():
 def test_set_server_weight_captures_prior_weight_and_validates():
     from proxy_aiops.ops import writes as ops
 
-    conn = _conn(HAPROXY, {_runtime_path(): {"admin_state": "ready", "weight": 100}})
+    # The read-back after the PUT must observe the new weight, so the fake
+    # server has to actually move — a static fixture would (correctly) trip the
+    # did-not-take-effect guard below.
+    state = {"admin_state": "ready", "weight": 100}
+    conn = _conn(HAPROXY, {_runtime_path(): state})
+    conn.put.side_effect = lambda *a, **kw: state.update(kw["json"])
     out = ops.set_server_weight(conn, "app", "web1", 0)
     assert out["priorState"] == {"weight": 100}
     _, kwargs = conn.put.call_args
@@ -154,6 +159,41 @@ def test_set_server_weight_captures_prior_weight_and_validates():
 
     with pytest.raises(ValueError, match="between"):
         ops.set_server_weight(conn, "app", "web1", 999)
+
+
+@pytest.mark.unit
+def test_set_server_weight_refuses_when_the_api_has_no_weight_field():
+    """Data Plane API 3.0.x cannot carry a runtime weight — do not pretend.
+
+    Measured on a live HAProxy 3.0 (Data Plane API 3.0.22): the runtime server
+    is represented as {address, admin_state, id, name, operational_state, port}
+    and a PUT carrying a weight answers **200 while changing nothing**. The tool
+    reported ``"weight": 25`` for a server still weighted 1, and captured a null
+    priorState so there was nothing to undo either. Data Plane API 3.4.1 does
+    expose weight/uweight and applies it, so this is a build capability, not a
+    v2-vs-v3 split.
+    """
+    from proxy_aiops.ops import writes as ops
+    from proxy_aiops.platform import UnsupportedOperation
+
+    conn = _conn(HAPROXY, {_runtime_path(): {
+        "address": "10.0.0.1", "admin_state": "ready", "id": "2",
+        "name": "web1", "operational_state": "up", "port": 80,
+    }})
+    with pytest.raises(UnsupportedOperation, match="does not expose a weight"):
+        ops.set_server_weight(conn, "app", "web1", 25)
+    conn.put.assert_not_called()
+
+
+@pytest.mark.unit
+def test_set_server_weight_refuses_to_report_a_weight_that_did_not_stick():
+    """A 200 that leaves the server unmoved is not a success."""
+    from proxy_aiops.connection import ProxyApiError
+    from proxy_aiops.ops import writes as ops
+
+    conn = _conn(HAPROXY, {_runtime_path(): {"admin_state": "ready", "weight": 100}})
+    with pytest.raises(ProxyApiError, match="still reports 100"):
+        ops.set_server_weight(conn, "app", "web1", 25)
 
 
 # ── wrong-platform writes raise the support matrix's teaching error ─────────

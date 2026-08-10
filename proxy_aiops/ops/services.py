@@ -218,11 +218,11 @@ def _haproxy_stat_rows(conn: Any) -> list[dict]:
                 "address": opt(pick(stats, "addr", default=""), 200),
                 "weight": as_int(pick(stats, "weight", default=0)),
                 "requestsTotal": as_int(pick(stats, "req_tot", default=0)),
-                "hrsp2xx": num(pick(stats, "hrsp_2xx", default=0)),
-                "hrsp4xx": num(pick(stats, "hrsp_4xx", default=0)),
-                "hrsp5xx": num(pick(stats, "hrsp_5xx", default=0)),
+                "hrsp2xx": as_int(pick(stats, "hrsp_2xx", default=0)),
+                "hrsp4xx": as_int(pick(stats, "hrsp_4xx", default=0)),
+                "hrsp5xx": as_int(pick(stats, "hrsp_5xx", default=0)),
                 "currentSessions": as_int(pick(stats, "scur", default=0)),
-                "rate": num(pick(stats, "rate", default=0)),
+                "rate": as_int(pick(stats, "rate", default=0)),
                 "lastStatusChange": as_int(pick(stats, "lastchg", default=0)),
             })
     return out

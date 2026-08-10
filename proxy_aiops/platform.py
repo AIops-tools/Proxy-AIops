@@ -303,8 +303,13 @@ _HAPROXY_PATHS = {
     "backends": "/v3/services/haproxy/configuration/backends",
     "backend_detail": "/v3/services/haproxy/configuration/backends/{name}",
     "servers": "/v3/services/haproxy/configuration/servers?backend={backend}",
-    "runtime_servers": "/v3/services/haproxy/runtime/servers?backend={backend}",
-    "runtime_server": "/v3/services/haproxy/runtime/servers/{name}?backend={backend}",
+    # v3 did not merely re-prefix the runtime servers resource, it RESTRUCTURED
+    # it: the backend moved from a query parameter into the path. Carrying the
+    # v2 shape under a /v3 prefix 404s on every HAProxy 3.x, which is what the
+    # first v2→v3 pass left behind. ProxyConnection._haproxy_path reverses this
+    # for servers still on v2.
+    "runtime_servers": "/v3/services/haproxy/runtime/backends/{backend}/servers",
+    "runtime_server": "/v3/services/haproxy/runtime/backends/{backend}/servers/{name}",
     "stats": "/v3/services/haproxy/stats/native",
 }
 _HAPROXY_UNSUPPORTED = {
@@ -351,7 +356,11 @@ register(
 register(
     Platform(
         name=HAPROXY,
-        label="HAProxy Data Plane API v2",
+        # No generation in the label: the connection speaks v3 by default and
+        # falls back to v2 per server, so pinning "v2" here put the wrong
+        # generation in every error message — including ones whose path was
+        # /v3, which sends anyone debugging in exactly the wrong direction.
+        label="HAProxy Data Plane API",
         auth_style=AUTH_BASIC,
         default_base_url="http://localhost:5555",
         paths=_HAPROXY_PATHS,

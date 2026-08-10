@@ -47,8 +47,12 @@ def test_path_templates_differ_per_platform():
     # The registry holds Data Plane API **v3** paths (HAProxy 3.x serves only
     # /v3); the connection rewrites them to /v2 for an older server.
     assert ha.path("backends") == "/v3/services/haproxy/configuration/backends"
+    # v3 moved the backend from a query parameter INTO the path. Carrying the
+    # v2 shape under a /v3 prefix 404s on every HAProxy 3.x — confirmed against
+    # the Data Plane API's own /v3/specification, which has no
+    # /runtime/servers/{name} at all.
     assert ha.path("runtime_server", name="web1", backend="app") == (
-        "/v3/services/haproxy/runtime/servers/web1?backend=app"
+        "/v3/services/haproxy/runtime/backends/app/servers/web1"
     )
     assert get_platform(CADDY).path("config_load") == "/load"
 
@@ -205,7 +209,8 @@ def test_path_traversal_ids_are_url_encoded():
     ha = get_platform(HAPROXY)
     path = ha.path("runtime_server", name="../../stop", backend="a&b=1")
     assert "../" not in path
-    assert "&b" not in path.split("?backend=")[1]
+    # The backend is a PATH SEGMENT in v3, so it must be encoded there too.
+    assert "&" not in path and "a%26b%3D1" in path
 
     tr = get_platform(TRAEFIK)
     path = tr.path("router_detail", name="../../entrypoints?x=1")

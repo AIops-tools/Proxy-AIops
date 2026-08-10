@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from proxy_aiops.ops._util import opt, s
+from proxy_aiops.ops._util import as_int, opt, s
 from proxy_aiops.platform import HAPROXY, TRAEFIK
 
 MAX_SERVICES = 200
@@ -72,9 +72,9 @@ def _traefik_counters(conn: Any) -> list[dict]:
         labels = sample["labels"]
         service = opt(labels.get("service", "(unknown)"), 200)
         code = opt(labels.get("code", "?"), 8)
-        bucket = by_service.setdefault(service, {"service": service, "total": 0.0, "codes": {}})
-        bucket["total"] += sample["value"]
-        bucket["codes"][code] = bucket["codes"].get(code, 0.0) + sample["value"]
+        bucket = by_service.setdefault(service, {"service": service, "total": 0, "codes": {}})
+        bucket["total"] += as_int(sample["value"])
+        bucket["codes"][code] = bucket["codes"].get(code, 0) + as_int(sample["value"])
     return list(by_service.values())
 
 
@@ -140,15 +140,15 @@ def traffic_stats(conn: Any) -> dict:
                     continue
                 bucket = per.setdefault(
                     service,
-                    {"service": service, "requestsTotal": 0.0,
-                     "durationSumSec": 0.0, "durationCount": 0.0},
+                    {"service": service, "requestsTotal": 0,
+                     "durationSumSec": 0.0, "durationCount": 0},
                 )
                 if sample["metric"] == _REQUESTS_METRIC:
-                    bucket["requestsTotal"] += sample["value"]
+                    bucket["requestsTotal"] += as_int(sample["value"])
                 elif sample["metric"] == _DURATION_SUM:
                     bucket["durationSumSec"] += sample["value"]
                 elif sample["metric"] == _DURATION_COUNT:
-                    bucket["durationCount"] += sample["value"]
+                    bucket["durationCount"] += as_int(sample["value"])
             stats = []
             for bucket in per.values():
                 count = bucket.pop("durationCount")

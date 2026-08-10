@@ -15,6 +15,7 @@ import typer
 from proxy_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    checked,
     cli_errors,
     console,
     double_confirm,
@@ -53,7 +54,7 @@ def server_state(
         return
     double_confirm(f"set state={state} on", f"{backend}/{server}")
     console.print_json(json.dumps(
-        gov.set_server_state(backend=backend, server=server, state=state, target=target)
+        checked(gov.set_server_state(backend=backend, server=server, state=state, target=target))
     ))
 
 
@@ -82,5 +83,5 @@ def server_weight(
         return
     double_confirm(f"set weight={weight} on", f"{backend}/{server}")
     console.print_json(json.dumps(
-        gov.set_server_weight(backend=backend, server=server, weight=weight, target=target)
+        checked(gov.set_server_weight(backend=backend, server=server, weight=weight, target=target))
     ))

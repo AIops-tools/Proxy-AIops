@@ -22,7 +22,7 @@ in the other ops modules, or injected) and they return the analysis.
 
 from __future__ import annotations
 
-from proxy_aiops.ops._util import num, opt, s
+from proxy_aiops.ops._util import as_int, num, opt, s
 
 MAX_ROWS = 100
 
@@ -254,13 +254,13 @@ _GENERIC_5XX = (
 )
 
 
-def _five_xx(codes: dict, classes: dict) -> tuple[float, str | None]:
+def _five_xx(codes: dict, classes: dict) -> tuple[int, str | None]:
     """Total 5xx count + the dominant concrete code (if per-code data exists)."""
-    five = {c: num(v) for c, v in (codes or {}).items() if str(c).startswith("5")}
+    five = {c: as_int(v) for c, v in (codes or {}).items() if str(c).startswith("5")}
     if five:
         dominant = max(five, key=lambda c: five[c])
         return sum(five.values()), dominant
-    return num((classes or {}).get("5xx")), None
+    return as_int((classes or {}).get("5xx")), None
 
 
 def error_rate_rca(
@@ -280,7 +280,7 @@ def error_rate_rca(
     rows = []
     fleet_total = fleet_5xx = 0.0
     for c in counters or []:
-        total = num(c.get("total"))
+        total = as_int(c.get("total"))
         five, dominant = _five_xx(c.get("codes") or {}, c.get("classes") or {})
         fleet_total += total
         fleet_5xx += five

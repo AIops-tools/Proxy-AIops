@@ -15,6 +15,7 @@ import typer
 from proxy_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    checked,
     cli_errors,
     console,
     double_confirm,
@@ -96,7 +97,9 @@ def config_set(
             parameters={"path": path, "value": value})
         return
     double_confirm("set config value at", path)
-    console.print_json(json.dumps(gov.set_config_value(path=path, value=parsed, target=target)))
+    console.print_json(
+        json.dumps(checked(gov.set_config_value(path=path, value=parsed, target=target)))
+    )
 
 
 @config_app.command("delete")
@@ -118,4 +121,4 @@ def config_delete(
             parameters={"path": path})
         return
     double_confirm("delete config path", path)
-    console.print_json(json.dumps(gov.delete_config_path(path=path, target=target)))
+    console.print_json(json.dumps(checked(gov.delete_config_path(path=path, target=target))))

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.0 — 2026-08-10
+
+### Fixed
+- **HAProxy runtime server writes could never have worked on Data Plane API v3.** `set_server_state` and `set_server_weight` addressed `/v3/services/haproxy/runtime/servers/{name}?backend={backend}` — the **v2** shape under a v3 prefix. v3 did not merely renumber that resource, it restructured it: the backend moved into the path (`/runtime/backends/{backend}/servers/{name}`). Every drain/maint/ready and every weight change 404'd, on every HAProxy 3.x. Settled against the Data Plane API's own `/v3/specification`, which offers no `/runtime/servers/{name}` at all. The registry now carries the v3 shape and the connection reshapes it — not just re-prefixes it — for servers still on v2. Verified live: drain really drained (all subsequent traffic moved to the other server), and `undo apply` restored `ready`.
+- **`set_server_weight` claimed a change the server never made.** Data Plane API 3.0.22 represents a runtime server as `{address, admin_state, id, name, operational_state, port}` — no weight — and answers a PUT carrying one with **200 while changing nothing**. The tool reported `"weight": 25` for a server still weighted 1, and captured a null prior state, so there was nothing to undo either. It now refuses with a teaching error naming what the API actually exposes, and on builds that do support weight (3.4.1 verified) it reads the value back and refuses to report a weight that did not stick. This is a Data Plane API build capability, not a v2-vs-v3 split — both were measured.
+- **Integer counters stopped rendering as floats** (bug class #2). `hrsp2xx`/`hrsp4xx`/`hrsp5xx` and `rate` came back as floats while `requestsTotal`, `currentSessions` and `weight` beside them were ints — one payload disagreeing with itself — and the error-rate RCA reported `requestsTotal: 137.0` / `errors5xx: 37.0`. The Traefik path had the same defect from accumulators seeded `0.0`. Confirmed against live counters on both platforms (HAProxy 3.0 and Traefik 3.3); genuine fractions (`errorRatePct`, `avgLatencyMs`, `daysToExpiry`) stay floats.
+- **Error messages no longer name the wrong API generation.** The HAProxy platform label was pinned to "Data Plane API v2", so failures on a `/v3` path reported v2 — pointing anyone debugging at the wrong generation.
+
 ## v0.7.0 — 2026-08-03
 
 ### Fixed

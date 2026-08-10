@@ -27,29 +27,49 @@ that never round-trips through float64.
 - **HAProxy is now verified** — and that run found the branch was **entirely
   broken**: every path was hardcoded to Data Plane API v2, but HAProxy 3.x serves
   only `/v3`, so the first probe 404'd. The connection now detects the API
-  generation and supports both. Still untested there: runtime server state changes
-  and the stats-derived traffic analyses under real load. **Attempted again on
-  2026-08-03 and blocked for a measured reason, not for lack of trying**: the
-  Data Plane API will not start under HAProxy's `program` directive in the
-  official 3.0 image. That directive does no shell quoting, so
-  `--reload-cmd "kill -SIGUSR2 1"` arrives as separate argv entries and the API
-  exits with *"the custom reload strategy requires these options to be set:
-  ReloadCmd, RestartCmd"*; a wrapper script and its own YAML config both failed
-  the same way, and HAProxy's `exit-on-failure` then tears down the container.
-  Running the Data Plane API as its **own container** against a shared config
-  volume is the next thing to try.
-- **TLS / certificate expiry** (`certs`) against real certificates — both verified
-  instances served plaintext on a lab port.
-- ~~**Guarded config writes** (`config set/delete`) and their undo paths.~~
-  **Closed 2026-08-03 against a real Caddy 2, and it found the undo of a deleted
-  array element was un-replayable.** `config set` → the upstream list really
-  changed → `undo apply` → the prior list restored. `config delete` of a route →
-  the route really disappeared → `undo apply` **failed**: the inverse re-created
-  the subtree with POST, and Caddy rejects that at an index past the (now
-  shorter) array. Two things were wrong — the inverse needed PUT (Caddy's
-  insert-at-index), and the pre-read had to go, because Caddy answers a GET of
-  an out-of-range index with **400, not 404**, so it re-raised before the write
-  reached the wire. Re-verified on the hardest case: deleting the **last**
-  element and restoring it into an empty array, back at its original index.
-- Traffic/error-rate analyses against a proxy under real load (the lab instances
-  served no traffic, so `analyze errors` had nothing to rank).
+  generation and supports both.
+  - ~~The Data Plane API would not start under HAProxy's `program` directive~~ —
+    **unblocked 2026-08-10 by running it as its own container**, which was the
+    recorded next thing to try. Recipe: share the config volume, share HAProxy's
+    PID namespace (`--pid=container:<haproxy>`) so `--reload-cmd "kill -SIGUSR2 1"`
+    reaches the master, and pass the master socket with `--master-runtime`.
+    Two details cost time and are worth writing down: the API **exits 1 silently
+    when started with plain `-d`** and needs `-i` (stdin open) to stay up, and it
+    refuses to start at all unless *both* `--reload-cmd` and `--restart-cmd` are
+    given.
+  - ~~Runtime server state changes~~ — **closed 2026-08-10, and they had never
+    worked**: `/v3/services/haproxy/runtime/servers/{name}?backend=...` is the v2
+    shape, and v3 moved the backend into the path. Drain now really drains (every
+    subsequent request moved to the other server) and `undo apply` restores
+    `ready`; weight is verified on a build that supports it, and refused on one
+    that does not (see below).
+  - ~~Stats-derived traffic analyses under real load~~ — **closed 2026-08-10**
+    against genuine traffic (137 requests, 37 real 5xx from a backend returning
+    500/503). `analyze errors` matched the server's own counters exactly
+    (37/137 = 27.01%) and ranked correctly; the same run on Traefik 3.3 matched
+    its Prometheus counters exactly (27/73 = 36.99%) and named the dominant code.
+    That comparison is also what exposed the counts being rendered as floats.
+- **A Data Plane API build may not support a runtime weight at all.** 3.0.22
+  represents a runtime server without a weight field and answers a PUT carrying
+  one with 200 while changing nothing; 3.4.1 exposes `weight`/`uweight` and
+  applies it. Both measured. The tool now refuses on the former rather than
+  reporting a change that did not happen, and verifies the value stuck on the
+  latter. **Not verified:** a genuinely old Data Plane API serving `/v2` — the
+  HAProxy 2.8 image ships Data Plane API 3.4.1, so the v2 downgrade path (whose
+  path *reshaping* was written in this round) still has no live evidence behind
+  it, only unit tests.
+- ~~**TLS / certificate expiry** (`certs`) against real certificates~~ —
+  **closed 2026-08-10.** `certs --sweep` against a Traefik serving a real
+  certificate read the expiry from a live handshake and got it exactly right:
+  14.0 days against a ground truth of 13.99, correct `notAfter`, bucketed
+  `warning`; re-run against a certificate expiring in one day it bucketed
+  `critical`. The **expired** bucket (negative days) was not exercised against a
+  live handshake — OpenSSL 3.0 on the lab box cannot mint a back-dated
+  certificate with `req -x509` — so that one bucket rests on unit tests over the
+  same, now twice-verified, probe path. `certs` on HAProxy correctly reports
+  itself unsupported (certificates are `.pem` files bound in haproxy.cfg).
+- **The tool's own transport over TLS is verified** (2026-08-10): with
+  `verify_ssl: true` against a self-signed Data Plane API the connection fails
+  with `CERTIFICATE_VERIFY_FAILED` and `doctor` exits non-zero; with verification
+  off, reads, a governed `server state` write and its `undo apply` all completed
+  over HTTPS.

@@ -35,7 +35,7 @@ from typing import Any
 
 from proxy_aiops.connection import ProxyApiError
 from proxy_aiops.ops._util import s
-from proxy_aiops.platform import encode_config_path
+from proxy_aiops.platform import UnsupportedOperation, encode_config_path
 
 SERVER_STATES = ("ready", "drain", "maint")
 _MIN_WEIGHT, _MAX_WEIGHT = 0, 256
@@ -379,8 +379,34 @@ def set_server_weight(conn: Any, backend: str, server: str, weight: int) -> dict
     weight = guard_set_server_weight(conn, backend, server, weight)
     path = conn.platform.path("runtime_server", name=server, backend=backend)
     prior = _runtime_server(conn, backend, server)
+    if "weight" not in prior:
+        # Not every Data Plane API build carries weight on the runtime server.
+        # Measured: 3.0.22 represents it as
+        # {address, admin_state, id, name, operational_state, port} and answers
+        # a PUT carrying a weight with **200 and no change at all**, while
+        # 3.4.1 has weight/uweight/iweight and applies it. Writing blind here
+        # reported "weight": 25 for a server still weighted 1 — a success line
+        # for a change that never happened, and with no prior value there is
+        # nothing to undo either. Refuse instead of pretending.
+        raise UnsupportedOperation(
+            f"This Data Plane API build does not expose a weight on the runtime "
+            f"server: {backend}/{server} is represented as "
+            f"{sorted(prior) or '(empty)'}. It accepts a PUT carrying a weight "
+            f"with 200 and silently discards it, so the change cannot be made "
+            f"or verified here. Upgrade the Data Plane API (3.4 exposes "
+            f"weight/uweight), or set the weight on the server in haproxy.cfg."
+        )
     prior_weight = prior.get("weight")
     conn.put(path, json={"weight": weight})
+    observed = _runtime_server(conn, backend, server).get("weight")
+    if observed is not None and int(observed) != weight:
+        # The API took the call but the server did not move. Never report that
+        # as done: an unconfirmed write is not a successful one.
+        raise ProxyApiError(
+            f"Set weight {weight} on {backend}/{server} was accepted but the "
+            f"server still reports {int(observed)}. The change did not take "
+            f"effect — check the Data Plane API version and the backend config."
+        )
     return {
         "action": "set_server_weight",
         "backend": s(backend, 128),

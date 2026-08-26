@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "proxy-aiops": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "proxy-aiops==0.8.0",
+        "proxy-aiops-mcp"
+      ]
+    }
+  }
+}

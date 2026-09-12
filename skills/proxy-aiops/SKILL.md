@@ -17,7 +17,7 @@ installer:
 argument-hint: "[a route/service/backend name, a hostname, or describe your proxy task]"
 allowed-tools:
   - Bash
-metadata: {"openclaw":{"requires":{"env":["PROXY_AIOPS_CONFIG"],"bins":["proxy-aiops"],"config":["~/.proxy-aiops/config.yaml"]},"optional":{"env":["PROXY_AIOPS_MASTER_PASSWORD"],"config":["~/.proxy-aiops/secrets.enc"]},"primaryEnv":"PROXY_AIOPS_CONFIG","homepage":"https://github.com/AIops-tools/Proxy-AIops","emoji":"🔀","os":["macos","linux"]}}
+metadata: {"openclaw":{"requires":{"anyBins":["proxy-aiops","uvx"]},"optional":{"env":["PROXY_AIOPS_CONFIG","PROXY_AIOPS_MASTER_PASSWORD"]},"homepage":"https://github.com/AIops-tools/Proxy-AIops","emoji":"🔀","os":["macos","linux"]}}
 compatibility: >
   Standalone, self-governed reverse-proxy operations across Traefik (API /api/..., metrics-text counters via /metrics), Caddy (admin API, default localhost:2019 — carries the write surface) and HAProxy (Data Plane API v2 /v2/..., HTTP Basic auth). Each target in the config names its own platform, and a name-keyed platform registry selects the API shape; an explicit support matrix raises teaching errors for ops a platform cannot do (traefik writes → its providers; caddy error counters → access logs; haproxy certs → the .pem pipeline), never a silent no-op. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency.
   All write operations are audited to a local SQLite DB under ~/.proxy-aiops/ (relocatable via PROXY_AIOPS_HOME).

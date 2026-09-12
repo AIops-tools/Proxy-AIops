@@ -1,0 +1,24 @@
+{
+  "id": "proxy-aiops",
+  "name": "Proxy AIops",
+  "description": "Governed Traefik + Caddy + HAProxy ops: routes, upstreams, certs, 5xx RCA. 28 tools.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "proxy-aiops": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "proxy-aiops==0.9.0",
+        "proxy-aiops-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

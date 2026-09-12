@@ -81,6 +81,13 @@ proxy-aiops init       # wizard: pick platform (traefik/caddy/haproxy) + optiona
 proxy-aiops doctor
 ```
 
+Or as an OpenClaw plugin, which installs this skill and its MCP server together:
+
+```bash
+openclaw plugins install clawhub:@aiops-tools/proxy-aiops
+openclaw skills info proxy-aiops          # expect: Visible to model: yes
+```
+
 ## When to Use This Skill
 
 - Get a one-shot snapshot (`overview` / `version_info` / `list_entrypoints`)

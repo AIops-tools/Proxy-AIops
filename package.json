@@ -1,6 +1,6 @@
 {
   "name": "@zw008/proxy-aiops",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Governed Traefik + Caddy + HAProxy ops: routes, upstreams, certs, 5xx RCA. 28 tools.",
   "private": true,
   "license": "MIT",

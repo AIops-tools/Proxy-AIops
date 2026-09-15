@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from proxy_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from proxy_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 routes_app = typer.Typer(
     name="routes",
@@ -19,6 +19,7 @@ routes_app = typer.Typer(
 
 @routes_app.command("list")
 @cli_errors
+@audited
 def routes_list(
     host: Annotated[
         str | None, typer.Option("--host", "-H", help="Filter by hostname")
@@ -34,6 +35,7 @@ def routes_list(
 
 @routes_app.command("show")
 @cli_errors
+@audited
 def routes_show(
     name: Annotated[str, typer.Argument(help="Route name (from 'routes list')")],
     target: TargetOption = None,
@@ -47,6 +49,7 @@ def routes_show(
 
 @routes_app.command("find")
 @cli_errors
+@audited
 def routes_find(
     host: Annotated[str, typer.Argument(help="Hostname to match")],
     path: Annotated[str, typer.Option("--path", "-p", help="Request path")] = "/",

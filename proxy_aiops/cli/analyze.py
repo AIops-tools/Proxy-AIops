@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from proxy_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from proxy_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 analyze_app = typer.Typer(
     name="analyze",
@@ -18,6 +18,7 @@ analyze_app = typer.Typer(
 
 @analyze_app.command("health")
 @cli_errors
+@audited
 def analyze_health(
     service: Annotated[
         str | None, typer.Option("--service", "-s", help="Filter by service/backend")
@@ -38,6 +39,7 @@ def analyze_health(
 
 @analyze_app.command("errors")
 @cli_errors
+@audited
 def analyze_errors(
     error_rate_pct: Annotated[
         float, typer.Option("--rate", help="5xx %% at/above which a service is flagged")
@@ -63,6 +65,7 @@ def analyze_errors(
 
 @analyze_app.command("conflicts")
 @cli_errors
+@audited
 def analyze_conflicts(target: TargetOption = None) -> None:
     """Route conflict & shadow analysis: shadowed / dead routes, redirect loops."""
     from proxy_aiops.ops import analysis as analysis_ops

@@ -7,10 +7,11 @@ from typing import Annotated
 
 import typer
 
-from proxy_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from proxy_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 
 @cli_errors
+@audited
 def certs_cmd(
     sweep: Annotated[
         bool,

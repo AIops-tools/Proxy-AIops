@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from proxy_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from proxy_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 services_app = typer.Typer(
     name="services",
@@ -18,6 +18,7 @@ services_app = typer.Typer(
 
 @services_app.command("list")
 @cli_errors
+@audited
 def services_list(target: TargetOption = None) -> None:
     """List services/backends with per-service server-up counts."""
     from proxy_aiops.ops import services as ops
@@ -28,6 +29,7 @@ def services_list(target: TargetOption = None) -> None:
 
 @services_app.command("show")
 @cli_errors
+@audited
 def services_show(
     name: Annotated[str, typer.Argument(help="Service name (from 'services list')")],
     target: TargetOption = None,
@@ -41,6 +43,7 @@ def services_show(
 
 @services_app.command("upstreams")
 @cli_errors
+@audited
 def services_upstreams(
     service: Annotated[
         str | None, typer.Option("--service", "-s", help="Filter by service/backend")

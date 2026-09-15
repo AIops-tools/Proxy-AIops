@@ -15,6 +15,7 @@ import typer
 from proxy_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    audited,
     checked,
     cli_errors,
     console,
@@ -33,6 +34,7 @@ config_app = typer.Typer(
 
 @config_app.command("snapshot")
 @cli_errors
+@audited
 def config_snapshot(target: TargetOption = None) -> None:
     """The live config tree / merged dynamic state (sanitised)."""
     from proxy_aiops.ops import configread as ops
@@ -43,6 +45,7 @@ def config_snapshot(target: TargetOption = None) -> None:
 
 @config_app.command("search")
 @cli_errors
+@audited
 def config_search(
     query: Annotated[str, typer.Argument(help="Substring to find in keys/values")],
     target: TargetOption = None,
@@ -62,6 +65,7 @@ def config_search(
 
 @config_app.command("get")
 @cli_errors
+@audited
 def config_get(
     path: Annotated[str, typer.Argument(help="Config path (e.g. apps/http/servers)")],
     target: TargetOption = None,

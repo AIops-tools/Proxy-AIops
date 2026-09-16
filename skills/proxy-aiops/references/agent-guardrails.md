@@ -31,12 +31,17 @@ What the tool *does* guarantee is that you can always see what happened:
 |---|---|
 | "Don't invent a value when a field is missing" | Traefik, Caddy and HAProxy express the same concepts differently, so a field one platform has and another does not comes back as `null`, never as `""`. A Caddy route's `raw` rule string is `null` — Caddy matches on a match list and has no such string — rather than a misleading empty rule. |
 | "Tell me if the output was cut off" | `search_config`, `traffic_stats` and `error_counters` return `{"matches"/"services": [...], "returned": N, "limit": L, "truncated": true/false}` — one convention across the repo. Truncation is measured (the config walk deliberately overshoots by one) and not guessed from the count reaching the cap. |
-| "Preserve the ordering / tell me what's most urgent" | `backend_health_rca`, `error_rate_rca`, `route_conflict_analysis` and `cert_expiry_sweep` rank findings worst-first with the measured number attached. Priority is in the payload, not implied by list position. |
+| "Make it show the number it judged on" | All four attach the measured number to every entry — `errorRatePct` against the fleet baseline, the conflicting route `priority`, `daysToExpiry` — so a claim can be checked against a figure, and `error_rate_rca`, `route_conflict_analysis` and `cert_expiry_sweep` order their rows by exactly that number. |
 | "Confirm before anything destructive" | `delete_config_path` and `load_config` require a `--dry-run`-able preview plus double confirmation at the CLI. Config writes capture the prior value so the undo token can restore it. |
 | "Log what you did" | Every governed call is audited to `~/.proxy-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. |
 | "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
 
 ## What still needs a prompt
+
+⚠️ **Do not read priority off list position.** `backend_health_rca` does order its `findings` worst-first, but on an internal score that is removed before the payload is returned, so the ordering cannot be checked from the output. No entry carries a `rank` or a
+`severity`, so nothing in the payload states which one matters most. Make the model weigh
+every entry's measured number and say which one it acted on, rather than treating the first
+one as the headline.
 
 These are model-behaviour problems the harness cannot fix from the outside.
 Copy this into your agent's system prompt:

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- `agent-guardrails.md` claimed all four RCAs "rank findings
+  worst-first" with "priority in the payload". Only `backend_health_rca` orders its
+  `findings`, and it does so on an internal score removed before the payload is
+  returned; the other three order rows, not findings. The claim sat in the table
+  headed "what the tool enforces — do not waste prompt budget on these".
+  The docs now state what is
+  actually ordered, and warn not to read priority off list position.
+
 ## v0.9.3 — 2026-09-15
 
 ### Fixed

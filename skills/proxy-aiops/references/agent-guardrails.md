@@ -31,7 +31,7 @@ What the tool *does* guarantee is that you can always see what happened:
 |---|---|
 | "Don't invent a value when a field is missing" | Traefik, Caddy and HAProxy express the same concepts differently, so a field one platform has and another does not comes back as `null`, never as `""`. A Caddy route's `raw` rule string is `null` — Caddy matches on a match list and has no such string — rather than a misleading empty rule. |
 | "Tell me if the output was cut off" | `search_config`, `traffic_stats` and `error_counters` return `{"matches"/"services": [...], "returned": N, "limit": L, "truncated": true/false}` — one convention across the repo. Truncation is measured (the config walk deliberately overshoots by one) and not guessed from the count reaching the cap. |
-| "Make it show the number it judged on" | `error_rate_rca` returns `errorRatePct`, `vsBaselineX` against the fleet baseline and a `severity` of `critical`/`warning` on every flagged service; `cert_expiry_sweep` returns `daysToExpiry` and a `bucket` per certificate, and orders by it. Both orderings are therefore checkable from the payload itself. |
+| "Make it show the number it judged on" | `error_rate_rca` returns `errorRatePct`, `vsBaselineX` against the fleet baseline and a `severity` of `critical`/`warning` on every flagged service; `cert_expiry_sweep` returns `daysToExpiry` and a `bucket` per certificate, and orders by `daysToExpiry`. Both orderings are therefore checkable from the payload itself. |
 | "Confirm before anything destructive" | `delete_config_path` and `load_config` require a `--dry-run`-able preview plus double confirmation at the CLI. Config writes capture the prior value so the undo token can restore it. |
 | "Log what you did" | Every governed call is audited to `~/.proxy-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. |
 | "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
@@ -63,12 +63,13 @@ TOOL USE
   a plausible-sounding answer.
 
 READING RESULTS
-- `backend_health_rca` findings and `route_conflict_analysis` results are not ordered by
-  severity — the latter is in the proxy's match order. Weigh each entry's own numbers and
-  say which one you acted on; never treat the first as the headline.
 - Read the whole result before concluding. If a result contains a "truncated"
   field that is true, say so and narrow the query instead of treating the
   partial result as complete.
+- `backend_health_rca` findings and `route_conflict_analysis` results are not ordered by
+  severity — the latter is in the proxy's match order. Weigh `backend_health_rca` findings on
+  their own `serversTotal`/`up`/`down`/`maint` counts. `route_conflict_analysis` results carry
+  no number at all — read `shadowedBy`, `reason` or `chain` and say which one you acted on.
 - A null field means this platform does not express that concept, or did not
   report it. Report it as "not available" — never infer it.
 - An "unsupported" field is a capability statement about the platform, not an

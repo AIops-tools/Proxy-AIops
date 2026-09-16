@@ -38,12 +38,15 @@ What the tool *does* guarantee is that you can always see what happened:
 
 ## What still needs a prompt
 
-⚠️ **Do not read priority off list position.** `backend_health_rca` does order its `findings` worst-first, but on an internal score that is removed before the payload is returned, so the ordering cannot be checked from the output. No entry carries a `rank` or a
-`severity`, so nothing in the payload states which one matters most. Make the model weigh
-every entry's measured number and say which one it acted on, rather than treating the first
-one as the headline.
-
 These are model-behaviour problems the harness cannot fix from the outside.
+
+⚠️ **`backend_health_rca`'s order cannot be checked from its output.** It does sort its
+`findings` worst-first, but on an internal score that is removed before the payload is
+returned, and its findings carry neither a `rank` nor a `severity` — so make the model weigh
+each finding rather than trust the order. The other three are safe to read in order: they
+sort on a number that is in the payload (`errorRatePct`, route `priority`, `daysToExpiry`),
+and `error_rate_rca` additionally labels each row `severity` (`critical`/`warning`).
+
 Copy this into your agent's system prompt:
 
 ```text

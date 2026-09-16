@@ -31,7 +31,7 @@ What the tool *does* guarantee is that you can always see what happened:
 |---|---|
 | "Don't invent a value when a field is missing" | Traefik, Caddy and HAProxy express the same concepts differently, so a field one platform has and another does not comes back as `null`, never as `""`. A Caddy route's `raw` rule string is `null` — Caddy matches on a match list and has no such string — rather than a misleading empty rule. |
 | "Tell me if the output was cut off" | `search_config`, `traffic_stats` and `error_counters` return `{"matches"/"services": [...], "returned": N, "limit": L, "truncated": true/false}` — one convention across the repo. Truncation is measured (the config walk deliberately overshoots by one) and not guessed from the count reaching the cap. |
-| "Make it show the number it judged on" | All four attach the measured number to every entry — `errorRatePct` against the fleet baseline, the conflicting route `priority`, `daysToExpiry` — so a claim can be checked against a figure, and `error_rate_rca`, `route_conflict_analysis` and `cert_expiry_sweep` order their rows by exactly that number. |
+| "Make it show the number it judged on" | `error_rate_rca` returns `errorRatePct`, `vsBaselineX` against the fleet baseline and a `severity` of `critical`/`warning` on every flagged service; `cert_expiry_sweep` returns `daysToExpiry` and a `bucket` per certificate, and orders by it. Both orderings are therefore checkable from the payload itself. |
 | "Confirm before anything destructive" | `delete_config_path` and `load_config` require a `--dry-run`-able preview plus double confirmation at the CLI. Config writes capture the prior value so the undo token can restore it. |
 | "Log what you did" | Every governed call is audited to `~/.proxy-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. |
 | "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
@@ -40,12 +40,13 @@ What the tool *does* guarantee is that you can always see what happened:
 
 These are model-behaviour problems the harness cannot fix from the outside.
 
-⚠️ **`backend_health_rca`'s order cannot be checked from its output.** It does sort its
-`findings` worst-first, but on an internal score that is removed before the payload is
-returned, and its findings carry neither a `rank` nor a `severity` — so make the model weigh
-each finding rather than trust the order. The other three are safe to read in order: they
-sort on a number that is in the payload (`errorRatePct`, route `priority`, `daysToExpiry`),
-and `error_rate_rca` additionally labels each row `severity` (`critical`/`warning`).
+⚠️ **Two of the four orderings cannot be checked, for different reasons.**
+`backend_health_rca` sorts its `findings` worst-first on an internal score that is removed
+before the payload is returned, and its findings carry neither a `rank` nor a `severity`.
+`route_conflict_analysis` is ordered by the proxy's own **evaluation order** (route priority,
+which is not returned) — that is match order, not severity: a shadowed route appearing first
+says nothing about how bad the shadowing is. `error_rate_rca` and `cert_expiry_sweep` are
+different: they sort on `errorRatePct` and `daysToExpiry`, both of which are in the payload.
 
 Copy this into your agent's system prompt:
 
@@ -62,6 +63,9 @@ TOOL USE
   a plausible-sounding answer.
 
 READING RESULTS
+- `backend_health_rca` findings and `route_conflict_analysis` results are not ordered by
+  severity — the latter is in the proxy's match order. Weigh each entry's own numbers and
+  say which one you acted on; never treat the first as the headline.
 - Read the whole result before concluding. If a result contains a "truncated"
   field that is true, say so and narrow the query instead of treating the
   partial result as complete.

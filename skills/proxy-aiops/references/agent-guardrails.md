@@ -48,7 +48,7 @@ which is not returned) — that is match order, not severity: a shadowed route a
 says nothing about how bad the shadowing is. `error_rate_rca` and `cert_expiry_sweep` are
 different: they sort on `errorRatePct` and `daysToExpiry`, both of which are in the payload.
 
-Copy this into your agent's system prompt:
+Recommended setup for a local model (adapt it to your agent client):
 
 ```text
 You operate a Traefik, Caddy or HAProxy reverse proxy through the proxy-aiops

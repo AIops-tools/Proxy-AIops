@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Traefik `list_routes` / `route_rca`: a router with no explicit priority (or
+  priority 0, which Traefik ignores) was read as priority 0, so every such route
+  sorted to the bottom and the shadowed-route verdicts were computed in the
+  wrong match order. Traefik's documented default is the rule length; that is
+  now the effective `priority`, with `prioritySource` (`explicit` /
+  `ruleLength`) saying which applied.
+
 ## v0.11.0 — 2026-10-15
 
 ### Fixed

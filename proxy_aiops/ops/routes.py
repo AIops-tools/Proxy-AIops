@@ -10,7 +10,7 @@ A *route* is the platform-neutral row this tool reasons about:
     haproxy.cfg, so hosts/paths stay empty; the default backend is the service).
 
 Normalised row: ``{name, platform, hosts, paths, priority, service, tls,
-enabled, redirectTo, raw}``.
+enabled, redirectTo, raw}``; Traefik rows add ``prioritySource``.
 """
 
 from __future__ import annotations
@@ -31,6 +31,20 @@ from proxy_aiops.platform import CADDY, TRAEFIK
 MAX_ROUTES = 500
 
 
+def _traefik_priority(explicit: Any, rule: str) -> dict:
+    """The priority Traefik actually matches with, and where it came from.
+
+    Traefik's documented default: an unset priority — and an explicit 0, which
+    it ignores — sorts by rule length, "the priority is directly equal to the
+    length of the rule". Reading an unset priority as 0 put every such route at
+    the bottom, so the shadowed-route verdicts were computed in the wrong order.
+    """
+    value = as_int(explicit)
+    if value:
+        return {"priority": value, "prioritySource": "explicit"}
+    return {"priority": len(rule), "prioritySource": "ruleLength"}
+
+
 def _traefik_routes(conn: Any) -> list[dict]:
     rows = conn.platform.rows(conn.get(conn.platform.path("routers")))
     out = []
@@ -41,7 +55,7 @@ def _traefik_routes(conn: Any) -> list[dict]:
             "platform": TRAEFIK,
             "hosts": [s(h, 128) for h in parse_rule_hosts(rule)],
             "paths": [s(p, 128) for p in parse_rule_paths(rule)],
-            "priority": as_int(pick(r, "priority", default=0)),
+            **_traefik_priority(pick(r, "priority"), rule),
             "service": opt(pick(r, "service")),
             # Traefik marks a TLS router with a "tls" object that is often
             # EMPTY ({}) — presence, not truthiness, is the signal.

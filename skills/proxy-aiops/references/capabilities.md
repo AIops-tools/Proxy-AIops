@@ -37,7 +37,7 @@ instead), never silent empties.
 | `proxy_overview` | platform/version + route/service counts + upstream up/down |
 | `version_info` | version/build info |
 | `list_entrypoints` | listeners: {name, address} |
-| `list_routes(host?)` | normalised routes: {name, hosts, paths, priority, service, tls, enabled, redirectTo} |
+| `list_routes(host?)` | normalised routes: {name, hosts, paths, priority, service, tls, enabled, redirectTo}; Traefik rows add `prioritySource` (`explicit`, or `ruleLength` — Traefik's default when priority is unset or 0) |
 | `route_detail(name)` | one route's full detail |
 | `find_route(host, path)` | routes that would serve a host/path, best first |
 | `list_services` | services/backends: {name, serversTotal, serversUp} |

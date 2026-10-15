@@ -406,3 +406,23 @@ def test_proxy_overview_resilient_shapes():
     assert out["routesTotal"] == 1
     assert out["servicesWithNoServerUp"] == 1
     assert out["upstreamsDown"] == 1
+
+
+# ── Traefik priority: unset or 0 means "rule length", not 0 ──────────────────
+
+
+@pytest.mark.unit
+def test_traefik_unset_or_zero_priority_is_the_rule_length():
+    rule_a = "Host(`app.example.com`)"
+    rule_b = "Host(`app.example.com`) && PathPrefix(`/api`)"
+    conn = _Conn({_p(TRAEFIK, "routers"): [
+        {"name": "a@file", "rule": rule_a, "service": "s", "status": "enabled"},
+        {"name": "b@file", "rule": rule_b, "service": "s", "status": "enabled", "priority": 0},
+        {"name": "c@file", "rule": rule_a, "service": "s", "status": "enabled", "priority": 7},
+    ]})
+    by = {r["name"]: r for r in routes.list_routes(conn)["routes"]}
+    assert by["a@file"]["priority"] == len(rule_a)
+    assert by["a@file"]["prioritySource"] == "ruleLength"
+    assert by["b@file"]["priority"] == len(rule_b)  # explicit 0 is ignored by Traefik
+    assert by["b@file"]["prioritySource"] == "ruleLength"
+    assert by["c@file"]["priority"] == 7 and by["c@file"]["prioritySource"] == "explicit"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.12.0 — 2026-10-15
 
 ### Fixed
 - Traefik `list_routes` / `route_rca`: a router with no explicit priority (or

@@ -2,8 +2,8 @@
 
 from typing import Optional
 
-from mcp_server._shared import _get_connection, mcp, tool_errors
 from proxy_aiops.governance import governed_tool
+from proxy_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from proxy_aiops.ops import services as ops
 
 

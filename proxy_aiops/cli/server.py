@@ -1,7 +1,7 @@
 """``proxy-aiops server`` — haproxy runtime server state / weight (governed).
 
 The writes delegate real execution to the ``@governed_tool`` twins in
-``mcp_server.tools.writes`` so a CLI write is audited and undo-recorded exactly
+``proxy_aiops.mcp_server.tools.writes`` so a CLI write is audited and undo-recorded exactly
 like an agent write.
 """
 
@@ -39,7 +39,7 @@ def server_state(
     dry_run: DryRunOption = False,
 ) -> None:
     """Set a server's admin state (governed write; prior state captured for undo)."""
-    from mcp_server.tools import writes as gov
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         # Through the governed call: set_server_state is haproxy-only and
@@ -68,7 +68,7 @@ def server_weight(
     dry_run: DryRunOption = False,
 ) -> None:
     """Set a server's LB weight (governed write; prior weight captured for undo)."""
-    from mcp_server.tools import writes as gov
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         # Through the governed call: set_server_weight is haproxy-only and

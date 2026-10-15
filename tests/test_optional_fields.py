@@ -177,7 +177,7 @@ def test_traffic_stats_report_truncation_against_the_service_cap():
 
 @pytest.mark.unit
 def test_undo_list_envelope_measures_truncation(monkeypatch):
-    from mcp_server.tools import undo as undo_tools
+    from proxy_aiops.mcp_server.tools import undo as undo_tools
 
     rows = [
         {

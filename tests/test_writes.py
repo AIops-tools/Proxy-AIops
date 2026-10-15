@@ -263,7 +263,7 @@ def test_caddy_server_writes_and_haproxy_config_writes_teach():
 def test_teaching_error_passes_through_mcp_error_layer(monkeypatch):
     """At the MCP layer the teaching text must reach the agent (sanitised),
     not collapse into a generic 'operation failed'."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(TRAEFIK)
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -276,8 +276,8 @@ def test_teaching_error_passes_through_mcp_error_layer(monkeypatch):
 
 @pytest.mark.unit
 def test_governed_set_server_state_records_undo_token(monkeypatch):
-    from mcp_server.tools import writes as t
     from proxy_aiops.governance.undo import get_undo_store
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(HAPROXY, {_runtime_path(): {"admin_state": "ready", "weight": 100}})
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -294,7 +294,7 @@ def test_governed_set_server_state_records_undo_token(monkeypatch):
 
 @pytest.mark.unit
 def test_write_risk_tiers():
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     assert t.delete_config_path._risk_level == "high"
     assert t.load_config._risk_level == "high"
@@ -307,7 +307,7 @@ def test_write_risk_tiers():
 
 @pytest.mark.unit
 def test_dry_run_previews_do_not_mutate(monkeypatch):
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(CADDY, {"/config/": {"admin": {"listen": "127.0.0.1:2019"},
                                       "apps": {}}})
@@ -352,7 +352,7 @@ def test_server_write_preview_refuses_off_platform(monkeypatch, platform):
     followed by a refusal on the real call reads as a transient failure and
     invites a retry loop.
     """
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(platform)
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -369,7 +369,7 @@ def test_server_write_preview_refuses_off_platform(monkeypatch, platform):
 @pytest.mark.unit
 def test_server_write_preview_refuses_invalid_input(monkeypatch):
     """The value checks run on the preview path too — same reason."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(HAPROXY)
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -387,7 +387,7 @@ def test_server_write_preview_refuses_invalid_input(monkeypatch):
 @pytest.mark.unit
 def test_server_write_preview_reports_normalised_state(monkeypatch):
     """The preview shows the value the real call would use, not the raw arg."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(HAPROXY)
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -401,7 +401,7 @@ def test_server_write_preview_reports_normalised_state(monkeypatch):
 
 def _assert_replayable(desc):
     """The undo descriptor's params must bind to the target tool's signature."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     tool = getattr(t, desc["tool"])
     sig = inspect.signature(tool)
@@ -411,7 +411,7 @@ def _assert_replayable(desc):
 
 @pytest.mark.unit
 def test_set_config_undo_restores_prior_subtree_and_replays():
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     desc = t._set_config_undo(
         {"path": "a/b"}, {"priorState": {"value": {"old": 1}, "existed": True}}
@@ -429,7 +429,7 @@ def test_set_config_undo_restores_prior_subtree_and_replays():
 
 @pytest.mark.unit
 def test_delete_and_load_undo_descriptors():
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     d = t._delete_config_undo({"path": "a/b"},
                               {"priorState": {"value": {"x": 1}, "existed": True}})
@@ -444,7 +444,7 @@ def test_delete_and_load_undo_descriptors():
 
 @pytest.mark.unit
 def test_server_undo_descriptors():
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     st = t._server_state_undo({"backend": "app", "server": "w1"},
                               {"priorState": {"adminState": "ready"}})
@@ -465,8 +465,8 @@ def test_server_undo_descriptors():
 def test_undo_replay_executes_end_to_end(monkeypatch):
     """Full loop: do a write, take the recorded undo descriptor, replay it via
     the named governed tool, and verify the inverse API call fires."""
-    from mcp_server.tools import writes as t
     from proxy_aiops.governance.undo import get_undo_store
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn(HAPROXY, {_runtime_path(): {"admin_state": "ready", "weight": 100}})
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -495,7 +495,7 @@ def test_deleting_an_array_element_records_an_insert_undo():
     undo token for a high-risk destructive write could never run, and array
     paths (routes/N, handle/N, upstreams/N) are the norm in a Caddy config.
     """
-    from mcp_server.tools.writes import _delete_config_undo
+    from proxy_aiops.mcp_server.tools.writes import _delete_config_undo
 
     desc = _delete_config_undo(
         {"path": "apps/http/servers/lab/routes/1"},
@@ -507,7 +507,7 @@ def test_deleting_an_array_element_records_an_insert_undo():
 
 @pytest.mark.unit
 def test_deleting_a_map_key_still_records_a_plain_recreate():
-    from mcp_server.tools.writes import _delete_config_undo
+    from proxy_aiops.mcp_server.tools.writes import _delete_config_undo
 
     desc = _delete_config_undo(
         {"path": "apps/http/servers/lab"},

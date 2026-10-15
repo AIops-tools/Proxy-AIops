@@ -46,7 +46,7 @@ _HAPROXY_STATS = [{"stats": [
 
 @pytest.mark.unit
 def test_backend_health_rca_live_pull_classifies(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
 
     _patch(monkeypatch, t, _Conn({_p(HAPROXY, "stats"): _HAPROXY_STATS}, platform=HAPROXY))
     out = t.backend_health_rca()
@@ -56,7 +56,7 @@ def test_backend_health_rca_live_pull_classifies(monkeypatch):
 
 @pytest.mark.unit
 def test_backend_health_rca_live_pull_propagates_error(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
 
     class _Boom(_Conn):
         def get(self, path, **_kw):
@@ -69,7 +69,7 @@ def test_backend_health_rca_live_pull_propagates_error(monkeypatch):
 
 @pytest.mark.unit
 def test_error_rate_rca_live_pull(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
 
     _patch(monkeypatch, t, _Conn({_p(HAPROXY, "stats"): _HAPROXY_STATS}, platform=HAPROXY))
     out = t.error_rate_rca(error_rate_pct=5.0)
@@ -79,7 +79,7 @@ def test_error_rate_rca_live_pull(monkeypatch):
 
 @pytest.mark.unit
 def test_error_rate_rca_live_pull_caddy_teaches(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
 
     _patch(monkeypatch, t, _Conn({}, platform=CADDY))
     out = t.error_rate_rca()
@@ -88,7 +88,7 @@ def test_error_rate_rca_live_pull_caddy_teaches(monkeypatch):
 
 @pytest.mark.unit
 def test_route_conflict_analysis_live_pull(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
 
     routers = [
         {"name": "specific", "rule": "Host(`a.example.com`) && PathPrefix(`/api`)",
@@ -110,7 +110,7 @@ def test_route_conflict_analysis_live_pull(monkeypatch):
 
 @pytest.mark.unit
 def test_cert_expiry_sweep_live_pull_haproxy_teaches(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
 
     _patch(monkeypatch, t, _Conn({}, platform=HAPROXY))
     out = t.cert_expiry_sweep()
@@ -119,7 +119,7 @@ def test_cert_expiry_sweep_live_pull_haproxy_teaches(monkeypatch):
 
 @pytest.mark.unit
 def test_cert_expiry_sweep_live_pull_caddy_buckets(monkeypatch):
-    from mcp_server.tools import analysis as t
+    from proxy_aiops.mcp_server.tools import analysis as t
     from proxy_aiops.ops import certs as cert_ops
 
     cfg = {"apps": {"http": {"servers": {
@@ -140,9 +140,9 @@ def test_cert_expiry_sweep_live_pull_caddy_buckets(monkeypatch):
 
 @pytest.mark.unit
 def test_read_tool_delegates_reach_ops(monkeypatch):
-    from mcp_server.tools import certs as ct
-    from mcp_server.tools import configread as cr
-    from mcp_server.tools import services as sv
+    from proxy_aiops.mcp_server.tools import certs as ct
+    from proxy_aiops.mcp_server.tools import configread as cr
+    from proxy_aiops.mcp_server.tools import services as sv
 
     conn = _Conn({_p(HAPROXY, "stats"): _HAPROXY_STATS}, platform=HAPROXY)
     _patch(monkeypatch, sv, conn)

@@ -198,7 +198,7 @@ def test_self_lockout_is_a_valueerror():
 
 @pytest.mark.unit
 def test_dry_run_of_an_admin_write_is_refused(monkeypatch):
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -213,7 +213,7 @@ def test_dry_run_of_an_admin_write_is_refused(monkeypatch):
 @pytest.mark.unit
 def test_dry_run_of_an_ordinary_config_write_still_previews(monkeypatch):
     """The dry-run guard must be exact, not a blanket refusal of every preview."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -229,7 +229,7 @@ def test_dry_run_of_an_ordinary_config_write_still_previews(monkeypatch):
 
 @pytest.mark.unit
 def test_dry_run_of_an_admin_delete_is_refused(monkeypatch):
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -243,7 +243,7 @@ def test_dry_run_of_an_admin_delete_is_refused(monkeypatch):
 
 @pytest.mark.unit
 def test_dry_run_of_an_ordinary_delete_still_previews(monkeypatch):
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -257,7 +257,7 @@ def test_dry_run_of_an_ordinary_delete_still_previews(monkeypatch):
 
 @pytest.mark.unit
 def test_dry_run_of_a_load_that_disables_admin_is_refused(monkeypatch):
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn({_ROOT: {"admin": {"listen": "127.0.0.1:2019"}, "apps": {}}})
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -273,7 +273,7 @@ def test_dry_run_of_a_load_that_disables_admin_is_refused(monkeypatch):
 @pytest.mark.unit
 def test_dry_run_of_a_safe_load_still_previews(monkeypatch):
     """Exactness: the extra config_root GET must not become a blanket refusal."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn({_ROOT: {"admin": {"listen": "127.0.0.1:2019"}, "apps": {}}})
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -288,7 +288,7 @@ def test_dry_run_of_a_safe_load_still_previews(monkeypatch):
 @pytest.mark.unit
 def test_dry_run_fails_open_exactly_like_the_real_call(monkeypatch):
     """A dry_run must never refuse something the real call would allow."""
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn({_ROOT: {"apps": {}}})  # live config carries no admin block
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -315,8 +315,8 @@ def _cli_dry_run(monkeypatch, tmp_path, argv, conn):
     import proxy_aiops.governance.audit as audit_mod
     import proxy_aiops.governance.policy as policy_mod
     import proxy_aiops.governance.undo as undo_mod
-    from mcp_server.tools import writes as gov
     from proxy_aiops.cli import app
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     monkeypatch.setenv("PROXY_AIOPS_HOME", str(tmp_path))
     audit_mod.reset_engine()
@@ -377,7 +377,7 @@ def test_the_refusal_reaches_the_agent_intact_through_the_mcp_layer(monkeypatch)
     than replaced — but it is truncated. The route back sits at the END of the
     message, so an over-long refusal loses exactly the part the caller acts on.
     """
-    from mcp_server.tools import writes as t
+    from proxy_aiops.mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)

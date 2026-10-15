@@ -12,7 +12,7 @@ import importlib
 import pytest
 from typer.testing import CliRunner
 
-# Kept in sync with mcp_server/server.py (the full registered tool surface).
+# Kept in sync with proxy_aiops/mcp_server/server.py (the full registered tool surface).
 EXPECTED_TOOLS = {
     # status
     "proxy_overview", "version_info", "list_entrypoints",
@@ -53,8 +53,8 @@ def test_all_modules_import():
         "proxy_aiops.cli.certs", "proxy_aiops.cli.analyze",
         "proxy_aiops.cli.configcmd", "proxy_aiops.cli.server",
         "proxy_aiops.cli.overview", "proxy_aiops.cli.doctor",
-        "mcp_server.server", "mcp_server._shared",
-        "mcp_server.tools.status", "mcp_server.tools.writes",
+        "proxy_aiops.mcp_server.server", "proxy_aiops.mcp_server._shared",
+        "proxy_aiops.mcp_server.tools.status", "proxy_aiops.mcp_server.tools.writes",
     ):
         importlib.import_module(name)
 
@@ -111,7 +111,7 @@ def test_cli_leaf_help_triggers_lazy_imports():
 
 @pytest.mark.unit
 def test_mcp_list_tools_exposes_expected_tools():
-    from mcp_server.server import mcp
+    from proxy_aiops.mcp_server.server import mcp
 
     tools = asyncio.run(mcp.list_tools())
     names = {t.name for t in tools}
@@ -120,7 +120,7 @@ def test_mcp_list_tools_exposes_expected_tools():
 
 @pytest.mark.unit
 def test_every_mcp_tool_is_governed_by_harness():
-    from mcp_server import _shared
+    from proxy_aiops.mcp_server import _shared
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
@@ -132,7 +132,7 @@ def test_every_mcp_tool_is_governed_by_harness():
 
 @pytest.mark.unit
 def test_tool_count_is_expected():
-    from mcp_server import _shared
+    from proxy_aiops.mcp_server import _shared
 
     assert len(_shared.mcp._tool_manager._tools) == 28
 
@@ -148,7 +148,7 @@ def test_risk_level_agrees_with_read_write_docstring_tag():
     16 such mislabels line-wide once, so it is kept even though read-only mode
     (its original motivation) is gone.
     """
-    from mcp_server import server
+    from proxy_aiops.mcp_server import server
 
     untagged, mismatched = [], []
     for name, tool in server.mcp._tool_manager._tools.items():

@@ -3,7 +3,7 @@
 Portable across the whole tool line: references ONLY
 ``proxy_aiops.governance.*`` and binds state to an isolated home via
 ``PROXY_AIOPS_HOME``. Every governed function under test is SYNTHETIC and
-defined inline — no real ops / cli / connection / mcp_server tool is imported.
+defined inline — no real ops / cli / connection / proxy_aiops.mcp_server tool is imported.
 
 Exercises the async wrapper (audit parity with sync), the error-capture path
 with secret redaction, BudgetExceeded propagation, positional /

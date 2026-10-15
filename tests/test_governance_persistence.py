@@ -125,8 +125,8 @@ def test_real_write_tool_persists_priorstate_undo(gov_home, monkeypatch):
     """End-to-end through a REAL product write tool: set_server_state must
     capture the server's prior admin state before changing it and persist the
     restore-undo on disk."""
-    from mcp_server.tools import writes as gov
     from proxy_aiops.connection import ProxyApiError
+    from proxy_aiops.mcp_server.tools import writes as gov
     from proxy_aiops.platform import HAPROXY, get_platform
 
     conn = MagicMock(name="conn")

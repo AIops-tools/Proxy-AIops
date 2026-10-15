@@ -1,7 +1,7 @@
 """``proxy-aiops config`` — caddy config tree: get / search / set / delete.
 
 The writes delegate real execution to the ``@governed_tool`` twins in
-``mcp_server.tools.writes`` so a CLI write is audited and undo-recorded exactly
+``proxy_aiops.mcp_server.tools.writes`` so a CLI write is audited and undo-recorded exactly
 like an agent write.
 """
 
@@ -86,7 +86,7 @@ def config_set(
     dry_run: DryRunOption = False,
 ) -> None:
     """Set a caddy config subtree (governed write; prior subtree captured)."""
-    from mcp_server.tools import writes as gov
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     try:
         parsed = json.loads(value)
@@ -114,7 +114,7 @@ def config_delete(
     dry_run: DryRunOption = False,
 ) -> None:
     """Delete a caddy config subtree (governed write, risk=high; captured for undo)."""
-    from mcp_server.tools import writes as gov
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         # Through the governed call: delete_config_path refuses the admin subtree

@@ -1,7 +1,7 @@
 """CLI write path — preview and confirmed write, both through governance.
 
 The CLI write commands delegate real execution to the ``@governed_tool``
-functions in ``mcp_server.tools``. These tests drive ``server state`` (haproxy)
+functions in ``proxy_aiops.mcp_server.tools``. These tests drive ``server state`` (haproxy)
 and ``config set`` (caddy) PAST the dry-run branch and the double-confirm
 prompts and assert the call really went through the governed path (audit row on
 disk) — the regression test for the "CLI writes were unaudited" line-wide fix.
@@ -57,7 +57,7 @@ def _fake_conn(platform, responses):
 @pytest.fixture
 def ha_conn(monkeypatch):
     """A fake haproxy connection wired into the governed write module."""
-    from mcp_server.tools import writes as gov
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     path = get_platform(HAPROXY).path("runtime_server", name="web1", backend="app")
     conn = _fake_conn(HAPROXY, {path: {"admin_state": "ready", "weight": 100}})
@@ -67,7 +67,7 @@ def ha_conn(monkeypatch):
 
 @pytest.fixture
 def caddy_conn(monkeypatch):
-    from mcp_server.tools import writes as gov
+    from proxy_aiops.mcp_server.tools import writes as gov
 
     conn = _fake_conn(CADDY, {"/config/apps/http/servers/srv0": {"listen": [":80"]}})
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)

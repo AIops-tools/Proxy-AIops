@@ -30,6 +30,8 @@ compatibility: >
 
 # Proxy AIops
 
+> **Audit availability:** Real writes require a durable audit intent. Reads and previews can continue if audit storage fails; check the warning and audit health before relying on their audit trail.
+
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Traefik Labs, the Caddy project, HAProxy Technologies, or the HAProxy project.** Traefik, Caddy and HAProxy are trademarks of their respective owners. Source at [github.com/AIops-tools/Proxy-AIops](https://github.com/AIops-tools/Proxy-AIops) under the MIT license.
 
 Governed reverse-proxy operations — **28 MCP tools** across **Traefik** (API +
@@ -216,7 +218,7 @@ of the account you connect it with (a read-only HAProxy Data Plane API role, a
 scoped Traefik/Caddy admin API — writes then fail at the server). There is no
 read-only switch, policy file, or approval gate.
 
-- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.proxy-aiops/audit.db` (relocatable via `PROXY_AIOPS_HOME`): params (secrets redacted), result, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
+- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.proxy-aiops/audit.db` (relocatable via `PROXY_AIOPS_HOME`): params (secrets redacted), outcome summary, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
 - `PROXY_AUDIT_APPROVED_BY` / `PROXY_AUDIT_RATIONALE` are optional annotations recorded on the audit row (who/why); they are never required and never block.
 - **Runaway guard** — a safety backstop, not authorization: the same call looped in a tight window trips a circuit breaker. Disable with `PROXY_RUNAWAY_MAX=0`.
 - Writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI; CLI writes execute through the same governed tools, so they are audited + undo-recorded.

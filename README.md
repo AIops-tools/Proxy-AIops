@@ -2,6 +2,8 @@
 
 # Proxy AIops
 
+> **Audit availability:** Real writes require a committed `pending` audit row and stop before contacting the platform if storage is unavailable. Reads and previews may continue with a warning; new audit rows store outcome summaries rather than full responses.
+
 Governed, audited AI-ops for **Traefik**, **Caddy** and **HAProxy** reverse proxies / load balancers — for AI agents (via MCP) and humans (via CLI).
 
 > **Disclaimer**: Community-maintained open-source project. **Not affiliated with, endorsed by, or sponsored by Traefik Labs, the Caddy project, HAProxy Technologies, or the HAProxy project.** Traefik, Caddy and HAProxy are trademarks of their respective owners. MIT licensed.
